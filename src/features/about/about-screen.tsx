@@ -91,7 +91,6 @@ export function AboutScreen(props: AboutScreenProps) {
       <main class="about">
         <div class="about-column">
           <section class="about-hero">
-            <p class="eyebrow">EDGE-NATIVE REVERSE ENGINEERING</p>
             <h1 class="about-title">Your device is the edge.</h1>
             <p class="about-lede">
               The reverse-engineering command line, rebuilt for the browser. Drop a binary into the
