@@ -50,13 +50,6 @@ export const CREDITS: readonly Credit[] = [
     note: "The native decompiler. Compiled to WebAssembly and run in a worker, on this device, with nothing uploaded.",
   },
   {
-    name: "Ghidra",
-    license: "Apache-2.0",
-    url: "https://github.com/NationalSecurityAgency/ghidra",
-    scope: "engine",
-    note: "The processor specifications Kuna reads, and the C++ decompiler it is a Rust port of.",
-  },
-  {
     name: "Rasc",
     license: "Apache-2.0",
     url: "https://github.com/TsingShui/rasc",
