@@ -16,10 +16,11 @@ bottom once there is a transcript, suggestions under it in the empty state — b
 a conversation that looks like the ones people already use is one they do not have
 to learn.
 
-The geometry and the layout are borrowed; the colour is not. The palette is this
-product's own — its accent, its greys, its green for the local-safe signal — and no
-typeface is named after anyone else's product. The one place more than one colour
-appears is the mark, and both its stops come from the accent.
+The geometry and the layout are borrowed; the colour and the type are not. The
+palette is this product's own — its accent, its greys, its green for the local-safe
+signal — and the type is the platform's. Icons are black and white: the mark and the
+avatars are an ink tile with the page's colour for the glyph, so the accent appears
+only where something is actionable, or where a word is the page's point.
 
 Two states share one DOM rather than two trees behind a `Show`: the same composer
 element is in both, so sending the first message does not move the element the caret

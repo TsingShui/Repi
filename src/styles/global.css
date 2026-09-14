@@ -2,11 +2,12 @@
  * Repi design tokens.
  *
  * Direction: the shape of the assistant surfaces people already use, in this
- * product's own colours. Borrowed: the soft geometry — capsules, generous radii, a
- * surface tone a step off the page — and the way a conversation is laid out. Not
- * borrowed: the palette, which is Repi's, and no typeface is named after anyone
- * else's product. A conversation that looks like the ones people know is one they
- * do not have to learn; one that looks like somebody else's product is a copy.
+ * product's own colours and type. Borrowed: the soft geometry — capsules, generous
+ * radii, a surface tone a step off the page — and the way a conversation is laid out.
+ * Not borrowed: the palette, which is Repi's, and the type, which is the platform's.
+ *
+ * Icons are black and white: the mark and the avatars are an ink tile with the page
+ * colour for the glyph, so the accent appears only where something is actionable.
  *
  * The earlier direction was the opposite: sharp geometry, no rounded corners, a
  * hairline on everything. It was written for a workspace of tables and tabs, which
@@ -21,7 +22,7 @@
 :root {
   color-scheme: light;
 
-  --font-ui: Inter, "SF Pro Text", -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 
   --canvas: #ffffff;
@@ -60,10 +61,6 @@
   --shadow-composer: 0 1px 3px rgb(60 64 67 / 8%), 0 4px 12px rgb(60 64 67 / 6%);
   --panel-lift: 0 8px 24px rgb(60 64 67 / 18%);
   --scrim: rgb(31 35 41 / 28%);
-
-  /* The mark takes a gradient, which is the borrowed idea; the two stops are the
-     product's own accent family. Give it a second hue and this is where it goes. */
-  --mark-gradient: linear-gradient(135deg, #4d6bfe, #8b9bff);
 }
 
 html[data-theme="dark"] {

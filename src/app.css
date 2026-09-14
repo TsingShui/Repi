@@ -102,9 +102,9 @@
 }
 
 /*
- * The mark sits on the accent gradient — the borrowed idea, in the product's own
- * two stops. It is also the mark beside anything the application says in the
- * conversation, so the two read as the same speaker.
+ * An ink tile with the page's colour for the glyph: black and white, in both themes.
+ * It is also the mark beside anything the application says in the conversation, so
+ * the two read as the same speaker.
  */
 .brand-mark {
   display: grid;
@@ -112,8 +112,8 @@
   height: 28px;
   place-items: center;
   border-radius: var(--r-xs);
-  background: var(--mark-gradient);
-  color: #ffffff;
+  background: var(--ink);
+  color: var(--canvas);
 }
 
 .brand-mark svg {
