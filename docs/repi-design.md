@@ -77,9 +77,8 @@ became the product's column.
 
 Three sections:
 
-**The hero.** The product's line and one paragraph saying where a binary is read and
-that the model request is the only thing that leaves. It carries no control and lists
-nothing: what it can recognise belongs to the moment a file is in front of it, not to a
+**The hero.** The product's line and one paragraph saying what the application does
+with a file and how far it currently goes. It carries no control and lists nothing: what it can recognise belongs to the moment a file is in front of it, not to a
 page you read first. The first version had the picker and the drop as two
 halves of one capsule, which was the right control on a landing page whose only job was
 to take a file; on a page you read, a call to action in the middle of the prose is a
@@ -103,6 +102,13 @@ forked from" to somebody who only wanted to know what they were receiving. Libra
 inside the bundle and build tooling are not listed at all — they are package
 dependencies — and the licence texts are not reproduced, because each one travels
 beside the artifact that needs it.
+
+Each note says what its project does: the native decompiler, the Android engine, the
+project one of them was written from. The earlier notes described where the work
+happens — compiled to WebAssembly, run in a worker, on this device, with nothing
+uploaded — which is this product's position rather than a fact about the project a
+reader came here to look up, and the same language was removed from the hero paragraph
+above for the same reason.
 
 Behind all of it, the structure field: an abstract view of an address space being read
 on this device. Decoration with a budget — 30 fps, a static frame under

@@ -39,18 +39,18 @@ export const CREDITS: readonly Credit[] = [
     name: "Kuna",
     license: "Apache-2.0",
     url: "https://github.com/Noelo-Lab/kuna",
-    note: "The native decompiler. Compiled to WebAssembly and run in a worker, on this device, with nothing uploaded.",
+    note: "The native decompiler: functions, code and symbols out of an ELF, PE or Mach-O binary.",
   },
   {
     name: "Rasc",
     license: "Apache-2.0",
     url: "https://github.com/TsingShui/rasc",
-    note: "The DEX and Android engine: a native Rust rewrite of ASC, compiled to WebAssembly. It answers an APK or a DEX file, and the class tree those screens show is its.",
+    note: "The Android engine: classes, methods and code out of an APK or a DEX file.",
   },
   {
     name: "ASC",
     license: "Apache-2.0",
     url: "https://github.com/MG1937/ASC",
-    note: "The Android decompiler Rasc is a rewrite of, and the behaviour it is measured against. Nothing here loads it; it is where the DEX side came from.",
+    note: "An Android decompiler, and the one Rasc was written from.",
   },
 ];

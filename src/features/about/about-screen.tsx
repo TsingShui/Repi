@@ -102,10 +102,9 @@ export function AboutScreen(props: AboutScreenProps) {
             <p class="eyebrow">EDGE-NATIVE REVERSE ENGINEERING</p>
             <h1 class="about-title">Your device is the edge.</h1>
             <p class="about-lede">
-              The reverse-engineering command line, rebuilt for the browser. A binary is read where it
-              already is — on the machine in your hands — and the only request that ever leaves it is
-              the one to a model, carrying text an agent chose rather than the file. That part is not
-              connected yet: today this reports what a file is and stops there.
+              The reverse-engineering command line, rebuilt for the browser. Drop a binary into the
+              conversation and it reports what the file is — format, architecture, container — and that
+              is where this build stops: nothing reads inside it yet.
             </p>
           </section>
 
@@ -146,7 +145,7 @@ export function AboutScreen(props: AboutScreenProps) {
                 </a>
                 <span class="credit-license">{PROJECT.license}</span>
               </div>
-              <p class="credit-note">This application, under the licence every part of it uses.</p>
+              <p class="credit-note">The application itself: it reads a binary and reports what it is.</p>
             </div>
 
             <For each={CREDITS}>
