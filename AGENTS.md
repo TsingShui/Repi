@@ -19,3 +19,19 @@ trigger. Ask for one:
 ```sh
 gh workflow run deploy.yml --repo TsingShui/Repi
 ```
+
+## Rules
+
+1. **A commit says where its code came from.** The subject starts with
+   `[HUMAN]` (a person wrote it), `[AGENT]` (an agent wrote it from a person's
+   prompt) or `[AUTOMATED]` (an agent wrote it with nobody prompting — a loop, a
+   CI job). `.githooks/commit-msg` refuses anything else. Install it once per
+   clone:
+
+   ```sh
+   git config core.hooksPath .githooks
+   ```
+
+   A merge commit is exempt, and so is the tag's position after a `fixup!` or
+   `squash!` prefix. `git commit --no-verify` gets past the hook; that is the
+   escape hatch, and using it leaves a trace in the reflog.

@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Refuses a commit whose subject does not say where the code came from.
+#
+#   [HUMAN]      a person wrote it
+#   [AGENT]      an agent wrote it from a person's prompt
+#   [AUTOMATED]  an agent wrote it with nobody prompting — a loop, a CI job
+#
+# One line to install it, once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# `git commit --no-verify` gets past this. That is git's escape hatch, and using
+# it leaves a trace in the reflog rather than being something this can stop.
+set -eu
+
+message=$1
+
+# git also says where the message came from. A merge message is git's, not
+# anybody's: there is no authored decision in it to attribute.
+if [ "${2:-}" = "merge" ]; then
+  exit 0
+fi
+
+subject=$(head -n 1 "$message")
+
+# `git commit --fixup` and `--squash` build on another commit's subject, so a tag
+# can only sit after what they left in front of it. Nothing else is skipped: an
+# untagged commit is the thing this exists to prevent.
+while :; do
+  case "$subject" in
+    "fixup! "* | "squash! "*) subject=${subject#*! } ;;
+    *) break ;;
+  esac
+done
+
+case "$subject" in
+  "[HUMAN]"* | "[AGENT]"* | "[AUTOMATED]"*) exit 0 ;;
+esac
+
+cat >&2 <<'EOF'
+The commit subject has to say where the code came from:
+
+  [HUMAN]      a person wrote it
+  [AGENT]      an agent wrote it from a person's prompt
+  [AUTOMATED]  an agent wrote it with nobody prompting
+
+For example:  [AGENT] Make AGENTS.md the commands and nothing else
+
+Edit the message, or use `git commit --no-verify` for a case the rule does not
+cover.
+EOF
+
+exit 1
