@@ -110,8 +110,6 @@ export function AboutScreen(props: AboutScreenProps) {
               the one to a model, carrying text an agent chose rather than the file. That part is not
               connected yet: today this reports what a file is and stops there.
             </p>
-
-            <span class="format-list">ELF · PE · MACH-O · APK · DEX</span>
           </section>
 
           <section class="about-section">

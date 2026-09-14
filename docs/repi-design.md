@@ -77,9 +77,10 @@ became the product's column.
 
 Three sections:
 
-**The hero.** The product's line, one paragraph saying where a binary is read and that
-the model request is the only thing that leaves, and the list of formats this build can
-recognise. It carries no control. The first version had the picker and the drop as two
+**The hero.** The product's line and one paragraph saying where a binary is read and
+that the model request is the only thing that leaves. It carries no control and lists
+nothing: what it can recognise belongs to the moment a file is in front of it, not to a
+page you read first. The first version had the picker and the drop as two
 halves of one capsule, which was the right control on a landing page whose only job was
 to take a file; on a page you read, a call to action in the middle of the prose is a
 detour, and the conversation is one tap away with the same two ways in.

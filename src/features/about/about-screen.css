@@ -55,15 +55,6 @@
   line-height: 1.6;
 }
 
-.format-list {
-  display: block;
-  margin-top: 20px;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-}
-
 /* ============================================================== sections */
 
 .about-section {
