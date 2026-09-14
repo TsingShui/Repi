@@ -19,35 +19,22 @@
 /*
  * Readability veil.
  *
- * Landscape puts the content column on the left, so a horizontal ramp protects
- * it. Portrait centres the content vertically, so the veil becomes a radial
- * pool over that block, which leaves the empty top and bottom of the field
- * fully visible instead of hiding it.
+ * A pool centred on the column, because the column is centred: the page used to be a
+ * hero aligned to the left gutter, and the veil was a ramp from that side, which left
+ * the middle of the field — and the text that now sits there — unmasked. The field
+ * stays vivid at the edges and the top, which is where there is nothing to read.
  */
 .structure-field::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to right,
-    rgb(var(--canvas-rgb) / 93%) 0%,
-    rgb(var(--canvas-rgb) / 87%) 26%,
-    rgb(var(--canvas-rgb) / 52%) 50%,
-    rgb(var(--canvas-rgb) / 16%) 71%,
-    rgb(var(--canvas-rgb) / 0%) 90%
+  background: radial-gradient(
+    76% 62% at 50% 34%,
+    rgb(var(--canvas-rgb) / 94%) 0%,
+    rgb(var(--canvas-rgb) / 88%) 42%,
+    rgb(var(--canvas-rgb) / 58%) 70%,
+    rgb(var(--canvas-rgb) / 18%) 88%,
+    rgb(var(--canvas-rgb) / 0%) 100%
   );
   content: "";
   pointer-events: none;
-}
-
-@media (max-width: 899px) {
-  .structure-field::after {
-    background: radial-gradient(
-      120% 58% at 6% 50%,
-      rgb(var(--canvas-rgb) / 93%) 0%,
-      rgb(var(--canvas-rgb) / 89%) 40%,
-      rgb(var(--canvas-rgb) / 60%) 66%,
-      rgb(var(--canvas-rgb) / 26%) 86%,
-      rgb(var(--canvas-rgb) / 8%) 100%
-    );
-  }
 }

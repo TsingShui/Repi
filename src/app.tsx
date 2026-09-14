@@ -3,18 +3,16 @@ import { createFinePointer } from "./lib/pointer";
 import { detectFormat } from "./lib/detect-format";
 import { AboutScreen } from "./features/about/about-screen";
 import { ChatScreen, type ChatLine } from "./features/chat/chat-screen";
-import { LicensesScreen } from "./features/licenses/licenses-screen";
 import "./app.css";
 
 /**
- * The conversation is the home page and has no route of its own. About and the
- * licence list are pages reached from it, and both are hash routes because the
+ * The conversation is the home page and has no route of its own. About — which
+ * carries the licence list — is reached from it, and is a hash route because the
  * deployment is a static host with no rewrite rules.
  */
-function route(): "about" | "licenses" | null {
+function route(): "about" | null {
   if (typeof window === "undefined") return null;
-  const hash = window.location.hash.replace(/^#\/?/, "");
-  return hash === "about" || hash === "licenses" ? hash : null;
+  return window.location.hash.replace(/^#\/?/, "") === "about" ? "about" : null;
 }
 
 export function App() {
@@ -130,14 +128,7 @@ export function App() {
     <div class="app" data-pointer={finePointer() ? "fine" : "coarse"}>
       <Switch>
         <Match when={page() === "about"}>
-          <AboutScreen
-            onPick={(file) => void accept(file)}
-            dropActive={dragging()}
-            onClose={() => (window.location.hash = "")}
-          />
-        </Match>
-        <Match when={page() === "licenses"}>
-          <LicensesScreen onClose={() => (window.location.hash = "")} />
+          <AboutScreen onClose={() => (window.location.hash = "")} />
         </Match>
         <Match when={true}>
           <ChatScreen lines={lines()} onSend={send} onPick={(file) => void accept(file)} />

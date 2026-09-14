@@ -14,7 +14,8 @@ What is in the repository today is the part of the old build that survives:
   DEX, both compiled to WebAssembly and run on the device — with their Worker
   transport and the contract they implement. They are not wired to anything yet:
   the surface that will call them is the Agent surface;
-- the licences page, because the engines ship with the page;
+- the About page, which carries the licence list — the engines ship with the page, so
+  their terms have to be readable from it;
 - the analysis contract's checks, which run in Node with no browser.
 
 The workspace UI that used to sit behind the home page — tabs, a navigator, code,
@@ -34,7 +35,7 @@ installed by `pi install`.
 | Build | Vite 8 with `vite-plugin-solid` |
 | Language | TypeScript, `strict` |
 | Styling | Plain CSS with custom-property tokens, light theme first |
-| Routing | A hash route for `/#/licenses`, and nothing else yet |
+| Routing | A hash route for `/#/about`, and nothing else yet |
 
 Everything is pinned in `package-lock.json`.
 
@@ -80,7 +81,8 @@ src/
   features/chat/                the conversation: transcript, composer, welcome
   features/about/               what Repi is, and the other half's install command
   features/about/structure-field.tsx  full-screen canvas backdrop
-  features/licenses/            the licences page and the credits it renders
+  features/about/               what Repi is, what it is built on, the install command
+  features/about/credits.ts     the credits and the scopes they are grouped by
   lib/detect-format.ts          local format detection, header plus ZIP directory
   lib/sha256.ts                 streaming digest, so a large file is never held
   lib/pointer.ts                fine or coarse pointer, read once
@@ -94,9 +96,9 @@ src/
 
 ### Licenses
 
-`/#/licenses` lists what Repi is built on and under which terms, grouped by where
-each project ends up: downloaded with the engine, in the page, or only used to
-build it. It is reachable from the top bar and needs no engine installed.
+The About page lists what Repi is built on and under which terms, grouped by where each
+project ends up: downloaded with the engine, in the page, or only used to build it. It
+is reachable from the conversation's bar and needs no engine installed.
 
 ### Building the engines
 

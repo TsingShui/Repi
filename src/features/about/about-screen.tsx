@@ -1,59 +1,37 @@
-import { createSignal } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
-import { StructureField, type StructureFieldApi } from "./structure-field";
+import { CREDITS, PROJECT, SCOPE_LABELS, type CreditScope } from "./credits";
+import { StructureField } from "./structure-field";
 import "./about-screen.css";
 
 /** The command that installs the Pi package half of Repi. */
 const QUICK_START = "pi install https://github.com/TsingShui/Repi";
 
+/** What you get, then what shows it, then what built it. */
+const SCOPE_ORDER: readonly CreditScope[] = ["engine", "upstream", "page", "build"];
+
 export interface AboutScreenProps {
-  /** A file was chosen. The application reads it and says so in the conversation. */
-  readonly onPick: (file: File | undefined) => void;
-  /** A file is being carried over the window, so the drop block should say so. */
-  readonly dropActive: boolean;
   /** Back to the conversation, which is the home surface. */
   readonly onClose: () => void;
 }
 
 /**
- * What Repi is, for someone deciding whether to use it.
+ * What Repi is, and what it is made of.
  *
- * This page was the home page until the conversation took that place. It is kept
- * as a page rather than deleted because everything on it is about the product
- * rather than about a file: the promise, the two ways in, and the command that
- * installs the other half of Repi.
+ * One page rather than two: the licence list used to live behind its own link, and it
+ * is the same kind of page as this one — something read once, deliberately, by
+ * somebody deciding whether to trust the thing. Two pages meant two designs for one
+ * job and a link that had to be found first.
  */
 export function AboutScreen(props: AboutScreenProps) {
   const [copyState, setCopyState] = createSignal<"idle" | "copied" | "selected">("idle");
   let commandNode: HTMLElement | undefined;
 
-  let field: StructureFieldApi | undefined;
-
   /*
-   * The drop is handled by the application, because it is accepted over every
-   * surface. The field only needs to answer the file that actually arrived, so it
-   * is pulsed from the picker here rather than from a drag state it would have to
-   * watch.
-   */
-  /**
-   * The same control the drop block falls back to, so neither block is a dead end.
-   * A ref rather than a querySelector: the shell now mounts more than one page, and
-   * a query would find whichever hidden input happened to be in the document.
-   */
-  let pickerInput: HTMLInputElement | undefined;
-  const openPicker = () => pickerInput?.click();
-
-  const pick = (file: File | undefined) => {
-    if (!file) return;
-    field?.pulse();
-    props.onPick(file);
-  };
-
-  /*
-   * The install line is for the other half of Repi: the Pi package that carries
-   * the toolchain, which is a different thing from this application. The command is
-   * on screen and selectable either way, so a refused clipboard is not worth an
-   * error — copying is the convenience, not the content.
+   * The install line is for the other half of Repi: the Pi package that carries the
+   * toolchain, which is a different thing from this application. The command is on
+   * screen and selectable either way, so a refused clipboard is not worth an error —
+   * copying is the convenience, not the content.
    */
   const copyCommand = async () => {
     try {
@@ -61,12 +39,12 @@ export function AboutScreen(props: AboutScreenProps) {
       setCopyState("copied");
     } catch {
       /*
-       * The clipboard can refuse: it needs a secure context, a focused document
-       * and either permission or a real user gesture. Doing nothing was the first
-       * version of this and it reads as a broken button — the click lands, the
-       * label does not change, and there is no way to tell whether it worked. The
-       * fallback selects the command instead, so the platform's own copy gesture
-       * always has something to act on.
+       * The clipboard can refuse: it needs a secure context, a focused document and
+       * either permission or a real user gesture. Doing nothing was the first version
+       * of this and it reads as a broken button — the click lands, the label does not
+       * change, and there is no way to tell whether it worked. The fallback selects
+       * the command instead, so the platform's own copy gesture always has something
+       * to act on.
        */
       const node = commandNode;
       const selection = window.getSelection();
@@ -94,7 +72,11 @@ export function AboutScreen(props: AboutScreenProps) {
 
   return (
     <>
-      <StructureField onReady={(api) => (field = api)} />
+      {/*
+        Decoration only now. It used to answer a file being accepted on this page; the
+        page does not accept files any more, and the component's pulse has no caller.
+      */}
+      <StructureField />
 
       <header class="top-bar">
         <div class="top-bar-group">
@@ -107,76 +89,39 @@ export function AboutScreen(props: AboutScreenProps) {
           </span>
           <span class="top-bar-title">About</span>
         </div>
-        <nav class="top-bar-links" aria-label="About this project">
+        <nav class="top-bar-links" aria-label="Elsewhere">
           <a class="top-bar-link" href="https://github.com/TsingShui/Repi" rel="noreferrer">
             GitHub
           </a>
           <a class="top-bar-link" href="https://tsingshui.art/about" rel="noreferrer">
             Who makes it<span class="top-bar-link-arrow" aria-hidden="true">↗</span>
           </a>
-          <a class="top-bar-link" href="#/licenses" data-testid="licenses-link">
-            Licenses
-          </a>
         </nav>
       </header>
 
       <main class="about">
-        <section class="about-hero">
-          <p class="eyebrow">EDGE-NATIVE REVERSE ENGINEERING</p>
-          <h1 class="hero-title">
-            Your device
-            <br />
-            is the edge.
-          </h1>
-          <p class="hero-copy">
-            The reverse-engineering command line, rebuilt for the browser. Nothing is uploaded: the
-            analysis runs on the machine in your hands. That is the shift this era makes possible — the
-            tooling no longer needs a datacentre, only the device you are already holding.
-          </p>
+        <div class="about-column">
+          <section class="about-hero">
+            <p class="eyebrow">EDGE-NATIVE REVERSE ENGINEERING</p>
+            <h1 class="about-title">Your device is the edge.</h1>
+            <p class="about-lede">
+              The reverse-engineering command line, rebuilt for the browser. A binary is read where it
+              already is — on the machine in your hands — and the only request that ever leaves it is
+              the one to a model, carrying text an agent chose rather than the file. That part is not
+              connected yet: today this reports what a file is and stops there.
+            </p>
 
-          <div class="hero-actions">
-            {/*
-              Two ways in, shown as two blocks. Tapping the second also opens the
-              picker: you cannot tap to drag, and a block that looks like a button
-              and answers nothing is worse than one that does the obvious thing.
-              The drag itself is handled by the application, for the whole window.
-            */}
-            <label class="entry-block is-primary" aria-label="Open a local file">
-              {/*
-                No `accept` filter on purpose: stripped binaries often carry no
-                extension, and iPadOS hides files that fail a type filter.
-              */}
-              <input
-                class="visually-hidden"
-                type="file"
-                ref={(node) => (pickerInput = node)}
-                onChange={(event) => {
-                  const picked = event.currentTarget.files?.[0];
-                  event.currentTarget.value = "";
-                  pick(picked);
-                }}
-              />
-              <span class="entry-block-label">Open</span>
-            </label>
+            <span class="format-list">ELF · PE · MACH-O · APK · DEX</span>
+          </section>
 
-            <button
-              class="entry-block is-secondary"
-              type="button"
-              data-testid="drop-block"
-              data-drop-active={props.dropActive ? "true" : "false"}
-              aria-label="Drop a file here, or open the file picker"
-              onClick={() => openPicker()}
-            >
-              <span class="entry-block-label">Drop file here</span>
-            </button>
-          </div>
-
-          <span class="format-list">ELF · PE · MACH-O · APK · DEX</span>
-
-          <div class="quick-start">
-            <p class="quick-start-lead">Want more? Try the full Extension version</p>
-            <div class="quick-start-row">
-              <span class="quick-start-label">Quick start</span>
+          <section class="about-section">
+            <h2 class="about-heading">The other half</h2>
+            <p class="about-body">
+              Repi is two things, installed separately. This is the application — the surface that reads
+              a binary on your device. The toolchain is a Pi package: a catalog of CLI tools and the
+              commands that check each one resolves.
+            </p>
+            <div class="quick-start">
               <code class="quick-start-command" ref={(node) => (commandNode = node)}>
                 {QUICK_START}
               </code>
@@ -190,8 +135,55 @@ export function AboutScreen(props: AboutScreenProps) {
                 {copyLabel()}
               </button>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="about-section" data-testid="credits">
+            <h2 class="about-heading">What it is built on</h2>
+            <p class="about-body">
+              Repi is a thin layer over work other people did and maintain. Each project is listed with
+              the terms it comes under, grouped by where it ends up.
+            </p>
+
+            <div class="credit" data-testid="credit-project" data-credit={PROJECT.name}>
+              <div class="credit-head">
+                <a class="credit-name" href={PROJECT.url} rel="noreferrer">
+                  {PROJECT.name}
+                </a>
+                <span class="credit-license">{PROJECT.license}</span>
+              </div>
+              <p class="credit-note">This application, under the licence every part of it uses.</p>
+            </div>
+
+            <For each={SCOPE_ORDER}>
+              {(scope) => (
+                <Show when={CREDITS.some((credit) => credit.scope === scope)}>
+                  <h3 class="credit-group">{SCOPE_LABELS[scope]}</h3>
+                  <For each={CREDITS.filter((credit) => credit.scope === scope)}>
+                    {(credit) => (
+                      <div class="credit" data-testid="credit" data-credit={credit.name}>
+                        <div class="credit-head">
+                          <a class="credit-name" href={credit.url} rel="noreferrer">
+                            {credit.name}
+                          </a>
+                          <span class="credit-license">{credit.license}</span>
+                        </div>
+                        <p class="credit-note">{credit.note}</p>
+                      </div>
+                    )}
+                  </For>
+                </Show>
+              )}
+            </For>
+
+            <p class="about-body about-body-quiet">
+              Each engine's <code>LICENSE</code> and <code>NOTICE</code> travel with its artifact — Kuna's
+              are copied next to the WebAssembly when it is built, as <code>/kuna/KUNA-LICENSE</code> and
+              <code>/kuna/KUNA-NOTICE</code>, and Rasc's are copied beside its module the same way.
+              Repi's own is served at <code>/LICENSE</code> and <code>/NOTICE</code> beside this page,
+              because serving it is distributing it.
+            </p>
+          </section>
+        </div>
       </main>
     </>
   );

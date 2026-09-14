@@ -1,30 +1,28 @@
+/*
+ * About: the product, the other half of it, and what it is built on.
+ *
+ * One centred column at the conversation's measure, because it is the same product:
+ * the earlier version of this page was a full-bleed hero aligned to the page's gutter,
+ * which made About and the licence list look like two sites with one hostname.
+ */
+
 .about {
   position: relative;
   z-index: 1;
-  display: flex;
   min-height: 0;
-  flex-direction: column;
+  flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.about-hero {
-  display: flex;
-  /* Fills the page: the hero is the whole home screen now that the footer is
-     gone, and it grows so a long notice never collides with the edge. */
-  flex: 1 0 auto;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(30px, 5vw, 72px) clamp(18px, 5vw, 64px);
-  padding-bottom: calc(clamp(30px, 5vw, 72px) + env(safe-area-inset-bottom));
-  padding-left: calc(clamp(18px, 5vw, 64px) + env(safe-area-inset-left));
-  padding-right: calc(clamp(18px, 5vw, 64px) + env(safe-area-inset-right));
+.about-column {
+  width: min(780px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 28px);
+  padding-bottom: calc(clamp(40px, 6vw, 80px) + env(safe-area-inset-bottom));
 }
 
-.brand-mark svg {
-  width: 17px;
-  height: 17px;
-  fill: currentColor;
-}
+/* ================================================================ hero */
 
 .eyebrow {
   display: inline-flex;
@@ -41,140 +39,72 @@
   letter-spacing: 0.02em;
 }
 
-.hero-title {
-  max-width: 15ch;
-  font-size: clamp(40px, 6.4vw, 76px);
+.about-title {
+  max-width: 18ch;
+  font-size: clamp(30px, 4.4vw, 44px);
   font-weight: 500;
   letter-spacing: -0.035em;
-  line-height: 1.02;
+  line-height: 1.04;
 }
 
-.hero-copy {
-  max-width: 620px;
-  margin: 22px 0 34px;
+.about-lede {
+  max-width: 62ch;
+  margin-top: 18px;
   color: var(--ink-muted);
   font-size: 16px;
   line-height: 1.6;
 }
 
-/*
- * Two ways in, joined into one object: no gap, one outline, an internal seam.
- * They are complements — the same outcome through two different gestures — so
- * they are drawn as two halves of a single control rather than two controls
- * that happen to sit next to each other.
- */
-.hero-actions {
-  display: flex;
-  width: fit-content;
-  align-self: flex-start;
-  max-width: 100%;
-  border: 1px solid var(--accent);
-  border-radius: var(--r-pill);
-}
-
-/* The outer corners only, so the two halves still read as one control with a seam
-   and a keyboard focus ring is not clipped. */
-
-.entry-block {
-  position: relative;
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 18px;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.entry-block.is-primary {
-  border-radius: var(--r-pill) 0 0 var(--r-pill);
-}
-
-.entry-block.is-secondary {
-  border-radius: 0 var(--r-pill) var(--r-pill) 0;
-}
-
-.entry-block-label {
-  white-space: nowrap;
-}
-
-.entry-block.is-primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.entry-block.is-primary:hover {
-  filter: brightness(1.06);
-}
-
-.entry-block.is-primary:active {
-  filter: brightness(0.96);
-}
-
-/* The seam is the only line between them, and it belongs to the accent. */
-.entry-block.is-secondary {
-  border-left: 1px solid var(--accent);
-  background: rgb(26 115 232 / 10%);
-  color: var(--accent);
-}
-
-.entry-block.is-secondary:hover {
-  background: rgb(26 115 232 / 18%);
-}
-
-/* The block is the drop target, so it answers a file being carried over it. */
-.entry-block.is-secondary[data-drop-active="true"] {
-  background: rgb(26 115 232 / 26%);
-}
-
-.entry-block:focus-within,
-.entry-block:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-/* The native control stays in the layout so assistive tech still reaches it. */
-/*
- * The file input is `.visually-hidden` from the global styles: the label around it
- * is the control, and hiding the input rather than the label keeps the platform
- * picker reachable from the keyboard and from a screen reader.
- */
-
-/*
- * The install line for the Pi package, which is the other half of Repi. It sits
- * under a hairline so it stays secondary to opening a file, but at reading size:
- * it was 10px mono and read as a footnote nobody would follow.
- */
-.quick-start {
-  max-width: 660px;
-  margin-top: 36px;
-  padding-top: 22px;
-  border-top: 1px solid var(--line);
-}
-
-.quick-start-lead {
-  margin-bottom: 14px;
-  color: var(--ink);
-  font-size: 15px;
-  letter-spacing: -0.01em;
-}
-
-.quick-start-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-
-.quick-start-label {
+.format-list {
+  display: block;
+  margin-top: 20px;
   color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================== sections */
+
+.about-section {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.about-heading {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.about-body {
+  max-width: 62ch;
+  margin-top: 12px;
+  color: var(--ink-muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.about-body code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.about-body-quiet {
+  margin-top: 26px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* ========================================================== quick start */
+
+.quick-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .quick-start-command {
@@ -192,12 +122,14 @@
   font-family: var(--font-mono);
   font-size: 14px;
   white-space: nowrap;
+  user-select: all;
+  cursor: text;
 }
 
 .quick-start-copy {
   min-height: 44px;
   flex: none;
-  padding: 0 16px;
+  padding: 0 18px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-pill);
   background: var(--canvas);
@@ -206,14 +138,8 @@
   font-size: 13.5px;
 }
 
-/* A pointer that is not a finger can take the tighter target. */
-.app[data-pointer="fine"] .quick-start-command,
-.app[data-pointer="fine"] .quick-start-copy {
-  min-height: 40px;
-}
-
 .quick-start-copy:hover {
-  border-color: var(--ink-faint);
+  background: var(--canvas-raised);
 }
 
 .quick-start-copy[data-copy-state="copied"] {
@@ -226,21 +152,52 @@
   color: var(--accent);
 }
 
-/* A refusal, not a readout: one line, and no table under it. */
-.about-notice {
-  max-width: 620px;
-  margin-top: 22px;
-  border-left: 2px solid var(--danger);
-  padding-left: 12px;
-  color: var(--danger);
-  font-size: 14px;
-  line-height: 1.55;
+/* ============================================================== credits */
+
+.credit {
+  margin-top: 8px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--canvas-raised);
 }
 
-.format-list {
-  display: block;
-  margin-top: 16px;
+.credit-group {
+  margin-top: 30px;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.credit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.credit-name {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.credit-name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.credit-license {
   color: var(--ink-faint);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+}
+
+.credit-note {
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.55;
 }

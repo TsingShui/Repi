@@ -138,9 +138,6 @@ export function ChatScreen(props: ChatScreenProps) {
           <a class="top-bar-link" href="#/about" data-testid="about-link">
             About
           </a>
-          <a class="top-bar-link" href="#/licenses">
-            Licenses
-          </a>
         </nav>
       </header>
 

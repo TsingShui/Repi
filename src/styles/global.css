@@ -36,7 +36,7 @@
 
   --ink: #1f2329;
   --ink-muted: #6b7280;
-  --ink-faint: #9aa1ab;
+  --ink-faint: #71767f;
 
   --accent: #4d6bfe;
   --accent-ink: #ffffff;
@@ -75,7 +75,7 @@ html[data-theme="dark"] {
 
   --ink: #eceef0;
   --ink-muted: #999ea5;
-  --ink-faint: #656b73;
+  --ink-faint: #8a9099;
 
   --accent: #8195ff;
   --accent-ink: #12141a;
