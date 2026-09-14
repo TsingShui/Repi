@@ -84,11 +84,16 @@ deterministic mock.
   `npm run build:kuna` to produce it from a local checkout (`KUNA_REPO`, default
   `~/zhome/kuna`). Without it the application still builds and still runs, and a
   native binary is refused in one line.
-- `public/rasc/` is 1.7 MB and **is committed**, because it is small enough to
-  ship and shipping it is what lets a clone — and the deployed site — decompile an
-  APK without a Rasc checkout. `npm run build:rasc` refreshes it from a checkout
-  (`RASC_REPO`, default `~/rasc`), and `PROVENANCE.md` there records the commit.
-  Nothing else in that directory is generated.
+- `public/rasc/` is the same arrangement now. `npm run build:rasc` produces it
+  from a checkout (`RASC_REPO`, default `~/rasc`), with `PROVENANCE.md` recording
+  the commit and the licence and notice copied in beside the module. The 1.7 MB
+  module used to be committed, on the argument that it was small enough to carry
+  and that carrying it let a clone — and the deployed site — decompile an APK with
+  no checkout at all; this repository carries no engine artifact now. What that
+  costs: a fresh clone cannot decompile an APK until the script runs, and the
+  smoke check skips its Rasc section and names the count it skipped. The deployed
+  site is unaffected, because the deploy workflow builds the module before it
+  builds the page.
 - `src/vendor/kuna/` and `src/vendor/rasc/` are the engines' browser harnesses,
   committed because the page imports them statically and a missing module is a
   build failure. They are refreshed wholesale by `build:kuna` and `build:rasc` —

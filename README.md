@@ -206,9 +206,10 @@ runs, and a native binary is refused in one line instead of being quietly handed
 to the mock.
 
 `build:rasc` builds the wasm and refreshes both the served module and the vendored
-host glue. Its output is 1.7 MB and **is committed**, unlike Kuna's: it is small
-enough to carry, and carrying it is what lets a clone — and the deployed page —
-decompile an APK with no checkout at all.
+host glue. Its 1.7 MB output goes to a gitignored `public/rasc/`, the same
+arrangement as Kuna's: a clone decompiles an APK once that script has run, and the
+deployed page does because the deploy workflow builds the module before it builds
+the page.
 
 Still absent: an APK's native libraries as their own units, portrait, side-by-side
 comparison, local project storage, and the Agent surface.

@@ -87,7 +87,7 @@ export function LicensesScreen(props: LicensesScreenProps) {
               Each engine's <code>LICENSE</code> and <code>NOTICE</code> travel with its artifact — Kuna's
               are copied next to the WebAssembly when it is built, as
               <code>/kuna/KUNA-LICENSE</code> and <code>/kuna/KUNA-NOTICE</code>, and Rasc's are
-              committed beside its wasm. Repi's own is served at <code>/LICENSE</code> and
+              copied beside its module the same way. Repi's own is served at <code>/LICENSE</code> and
               <code>/NOTICE</code> alongside this page, because serving it is distributing it. The
               JavaScript packages carry their licence files inside their published packages.
             </p>

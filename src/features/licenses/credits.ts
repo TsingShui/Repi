@@ -8,11 +8,12 @@
  * reader checking a licence needs to know which one they are looking at.
  *
  * **The licence text is not reproduced here.** Apache-2.0 requires that a
- * recipient gets a copy of the licence, and they do: `npm run build:kuna` copies
- * Kuna's `LICENSE` and `NOTICE` into the served directory, so the copy travels
- * with the artifact that needs it. Repeating four licences on this page would be
- * four more copies to keep in sync, and none of them would be the one the
- * redistributed binary actually carries.
+ * recipient gets a copy of the licence, and they do: `npm run build:kuna` and
+ * `npm run build:rasc` copy each engine's `LICENSE` and `NOTICE` into the served
+ * directory beside its module, so the copy travels with the artifact that needs
+ * it. Repeating four licences on this page would be four more copies to keep in
+ * sync, and none of them would be the one the redistributed binary actually
+ * carries.
  */
 
 /** Where a project ends up, which is the part a licence question turns on. */

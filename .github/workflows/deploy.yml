@@ -1,10 +1,11 @@
 name: Deploy Repi
 
-# The deployed site needs the engine, and the engine is not in this repository.
-# `public/kuna/` is gitignored build output, so this job builds Kuna from source
-# before it builds the page. Without that step the site would deploy cleanly and
-# every native binary would report the engine as missing — a working site with a
-# dead feature, which is the failure this pipeline exists to prevent.
+# The deployed site needs both engines, and neither is in this repository:
+# `public/kuna/` and `public/rasc/` are gitignored build output, so this job builds
+# them from source before it builds the page. Without those steps the site would
+# deploy cleanly and every native binary and every APK would report the engine as
+# missing — a working site with two dead features, which is the failure this
+# pipeline exists to prevent.
 on:
   workflow_dispatch:
   push:
@@ -28,6 +29,8 @@ env:
   CARGO_TERM_COLOR: always
   # `build:kuna` reads this; it defaults to ~/zhome/kuna for local work.
   KUNA_REPO: ${{ github.workspace }}/kuna
+  # The same for `build:rasc`, which defaults to ~/rasc locally.
+  RASC_REPO: ${{ github.workspace }}/rasc
 
 jobs:
   build:
@@ -42,20 +45,31 @@ jobs:
           repository: Noelo-Lab/kuna
           path: kuna
 
+      - name: Check out Rasc
+        uses: actions/checkout@v4
+        with:
+          repository: TsingShui/rasc
+          path: rasc
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-wasip1
+          targets: |
+            wasm32-wasip1
+            wasm32-unknown-unknown
 
       # Measured on the first real run, with no cache: the whole job is 2m29s, of
       # which the SLEIGH specs are 34s and the engine — 43 crates on the wasm
       # target, plus the compiler natively — is 81s. The cache is here because
       # that was the *first* run and there is no reason for the second to pay it
-      # again, not because the build is slow.
+      # again, not because the build is slow. Rasc is the second workspace, added
+      # when its module stopped being committed to this repository.
       - name: Cache the Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: kuna/decompiler
+          workspaces: |
+            kuna/decompiler
+            rasc
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -73,14 +87,19 @@ jobs:
         working-directory: kuna
         run: make specs
 
-      - name: Build the engine and assemble it
+      - name: Build Kuna and assemble it
         run: npm run build:kuna
 
-      # The engine is 25 MB of output that this job is responsible for producing
+      # No specs step for Rasc: its `cargo build` reads nothing the checkout does
+      # not already have, which is why Kuna has one and this does not.
+      - name: Build Rasc and assemble it
+        run: npm run build:rasc
+
+      # The engines are ~27 MB of output that this job is responsible for producing
       # and that nothing else would notice was absent. Both of these have been
       # real failures in this project: a path that pointed at the wrong directory,
       # and an availability probe that believed a 200 from an SPA fallback.
-      - name: Check the engine is actually in the build
+      - name: Check the engines are actually in the build
         run: |
           set -eu
           size=$(wc -c < public/kuna/kuna_wasm.wasm)
@@ -93,12 +112,25 @@ jobs:
             echo "::error::no .sla under public/kuna/specs"
             exit 1
           fi
-          echo "engine: $((size / 1024 / 1024)) MB of wasm, $specs .sla files"
+          rasc=$(wc -c < public/rasc/rasc.wasm)
+          if [ "$rasc" -lt 500000 ]; then
+            echo "::error::rasc.wasm is $rasc bytes — the engine did not build"
+            exit 1
+          fi
+          # Only the build can put the licence beside the module, and nothing else
+          # checks that it arrived. Apache-2.0 requires that it does.
+          for file in RASC-LICENSE RASC-NOTICE; do
+            if [ ! -s "public/rasc/$file" ]; then
+              echo "::error::$file is missing from public/rasc"
+              exit 1
+            fi
+          done
+          echo "engines: $((size / 1024 / 1024)) MB of kuna wasm, $specs .sla files, $((rasc / 1024 / 1024)) MB of rasc wasm"
 
       # The strongest check available before shipping: run the engine on a real
       # binary, through a host that has nothing to do with the browser. If this
       # passes, what is about to be deployed can decompile.
-      - name: Prove it decompiles
+      - name: Prove Kuna decompiles
         run: |
           node scripts/kuna-oracle.mjs list sample.elf > /tmp/kuna-list.json
           node --input-type=module -e '
@@ -109,6 +141,24 @@ jobs:
               process.exit(1);
             }
             console.log(`the engine lists ${count} functions`);
+          '
+
+      # The same check for the other engine, and it matters more here: Rasc's
+      # module is fetched by the page at runtime, so a build that produced the wrong
+      # thing would deploy as "the engine is not installed" rather than as a failure.
+      - name: Prove Rasc decompiles
+        run: |
+          node scripts/rasc-fixtures.mjs /tmp/rasc-fixtures
+          node scripts/rasc-oracle.mjs classes /tmp/rasc-fixtures/classes.apk > /tmp/rasc-classes.json
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const { text } = JSON.parse(readFileSync("/tmp/rasc-classes.json", "utf8"));
+            const classes = text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+            if (classes.length === 0) {
+              console.error("::error::the engine listed no classes");
+              process.exit(1);
+            }
+            console.log(`the engine lists ${classes.length} classes`);
           '
 
       - name: Build Repi

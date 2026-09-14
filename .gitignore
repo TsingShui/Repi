@@ -4,7 +4,11 @@ node_modules/
 # which is tracked vendored source. That mistake cost eight files once.
 /dist/
 .smoke/
+# Both engines' artifacts are build output. Nothing engine-shaped is committed,
+# so a clone runs `build:kuna` / `build:rasc` to get them and the deploy
+# workflow builds both before it builds the page.
 public/kuna/
+public/rasc/
 .pi/
 .DS_Store
 docs/.direction-demos/

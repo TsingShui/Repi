@@ -646,15 +646,18 @@ line instead of being quietly handed to the mock.
 Kuna is Apache-2.0 and is derived from Ghidra, also Apache-2.0; the vendored WASI
 shim is MIT/Apache-2.0.
 
-**Rasc is the exception to that arrangement, and deliberately.** `npm run
-build:rasc` reads a checkout (default `~/rasc`, or `RASC_REPO`), builds the
-`wasm32-unknown-unknown` module, refreshes the vendored host glue, and copies the
-licence and notice. Its output is `public/rasc/rasc.wasm` — and it is
-**committed**, which Kuna's is not. The reason is size: this module is 1.7 MB
-against Kuna's 25 MB and its SLEIGH tree, so the cost of carrying it in the
-repository is a rounding error next to the difference it makes. A clone builds a
-page that decompiles an APK, and the deployed site does too, because the artifact
-is already there. Kuna's does not, and that is the trade it makes for its size.
+**Rasc is the same arrangement now, and the argument for its being the exception
+is worth keeping.** `npm run build:rasc` reads a checkout (default `~/rasc`, or
+`RASC_REPO`), builds the `wasm32-unknown-unknown` module, refreshes the vendored
+host glue, and copies the licence and notice. Its output is `public/rasc/`,
+gitignored like Kuna's. The module used to be committed, on the argument that
+1.7 MB against Kuna's 25 MB and SLEIGH tree is a rounding error and that carrying
+it let a clone — and the deployed page — decompile an APK with no checkout at all.
+That arrangement is gone: this repository carries no engine artifact. What it
+costs is that a clone decompiles an APK only once `npm run build:rasc` has run,
+and that the smoke check skips its Rasc section — naming how many checks it did not
+run — whenever the module is absent. The deployed site still decompiles an APK,
+because the deploy workflow builds the module before it builds the page.
 
 Rasc is Apache-2.0; the licence and notice travel with the module in
 `public/rasc/`, and `PROVENANCE.md` there records the commit it was built from.

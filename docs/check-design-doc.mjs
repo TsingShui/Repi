@@ -75,6 +75,11 @@ const retired = [
   // directory named for the idea rather than the product. The path name is retired: the
   // documents must say Repi and the repository, not where the source used to sit.
   [/edge-compute/, "the application is Repi in a repository of its own; the internal path name is retired"],
+  // The Rasc module stopped being committed and the repository now carries no engine artifact, so
+  // the documents must not promise a clone an engine it would have to build. Both documents made
+  // the claim in bold; a looser pattern here matched a bullet marker at the top of one section
+  // through to a bold paragraph in another, which is a check that fails for the wrong reason.
+  [/\*\*(is )?committed\*\*/, "engine artifacts are build output: a clone runs build:rasc, and the deploy workflow builds both"],
 ];
 
 /*
