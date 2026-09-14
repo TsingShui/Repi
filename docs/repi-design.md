@@ -9,36 +9,49 @@
 
 ## The conversation
 
-The home surface is one conversation: a column, a transcript that scrolls, and a
-composer pinned under it. The shape is the one chat interfaces have settled on,
-because it is the shape a person already knows how to use; the skin is this
-product's — square geometry, one accent, hairline rules.
+The home surface is one conversation: a wide centred column, a transcript, and a
+capsule composer. The shape and the language are both the ones the assistant
+surfaces have settled on — a greeting over the composer when nothing has been said,
+soft radii, one blue accent, a gradient phrase in the greeting and the same gradient
+behind the mark, a composer that docks to the bottom once there is a transcript —
+because a conversation that looks like the ones people already use is one they do
+not have to learn.
 
-The empty state carries the brand and one sentence about what this is: analysis
-runs on this device. It also says what is not true yet, in the same breath:
-**no model is connected, so the conversation does not answer**, and a dropped file
-reports what it recognised and stops there. A welcome screen that looked like a
-working assistant would be a lie the first keystroke exposes.
+Two states share one DOM rather than two trees behind a `Show`: the same composer
+element is in both, so sending the first message does not move the element the caret
+is in. With nothing said yet the block is centred in the window, a little above the
+middle, with two suggestions under the composer; once there is a transcript the
+column sits against the composer and the suggestions go away.
+
+The earlier direction was the opposite of this one — sharp geometry, no rounded
+corners, a hairline on everything — and it was written for a workspace of tables and
+tabs. That workspace is gone, and square corners inside a rounded shell would read as
+two products, so the geometry moved with the product. The one place more than one
+colour is used is the assistant's own mark.
 
 The transcript holds three kinds of line, and they are told apart rather than
 merged:
 
-- **what the user typed**, right-aligned in a tinted block;
+- **what the user typed**, right-aligned in a tinted bubble;
 - **what the application says about itself** — what it recognised, what it cannot
-  read, what is not connected — left-aligned, muted, labelled `REPI`;
-- **a file**, as a card: name, format, architecture or container note, size, and
-  whether anything in this build can read it. The card exists so that "nothing
-  here reads this" is an answer rather than silence.
+  read, what is not connected — left-aligned behind the mark, labelled `Repi`;
+- **a file**, as a card under the same mark: name, format, architecture, size, and a
+  badge saying whether anything in this build can read it. That badge is the point
+  of the card: "nothing here reads this" is an answer, and silence is not.
 
-The composer is one bordered box: attach, the input, send. Enter sends and
-Shift+Enter starts a line, which is what a chat interface does; a touch keyboard's
-return key is a real newline, because Shift cannot be held on glass. The two
-controls in the box carry the 44px floor under a coarse pointer, and they are the
-only targets on the surface that are not already text-sized.
+The bar carries the state of the thing the page is for, in the place a chat header
+usually puts the model it is talking to: a pill reading **No model**, with no chevron
+because there is no menu behind it.
 
-Under the box, always visible rather than only on the welcome screen: **nothing
-you type, and no file you drop, leaves this device.** It is the claim the product
-is built on, and a claim made once at the top of a scroll is a claim the user stops
+The composer is one capsule: attach, the input, send. Enter sends and Shift+Enter
+starts a line; a touch keyboard's return key is a real newline, because Shift cannot
+be held on glass. A send with nothing to send is a white circle on the tinted
+capsule rather than a bare arrow, because a control that has no container reads as an
+icon that failed to render.
+
+Under the box, always visible rather than only on the welcome screen: **nothing you
+type, and no file you drop, leaves this device.** It is the claim the product is
+built on, and a claim made once at the top of a scroll is a claim the user stops
 being able to check.
 
 ## About page

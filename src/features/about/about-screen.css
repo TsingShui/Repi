@@ -27,20 +27,26 @@
 }
 
 .eyebrow {
-  margin-bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  margin-bottom: 20px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
   color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.14em;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .hero-title {
   max-width: 15ch;
-  font-size: clamp(46px, 7vw, 92px);
-  font-weight: 530;
-  letter-spacing: -0.055em;
-  line-height: 0.96;
+  font-size: clamp(40px, 6.4vw, 76px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
 }
 
 .hero-copy {
@@ -63,7 +69,11 @@
   align-self: flex-start;
   max-width: 100%;
   border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
 }
+
+/* The outer corners only, so the two halves still read as one control with a seam
+   and a keyboard focus ring is not clipped. */
 
 .entry-block {
   position: relative;
@@ -75,8 +85,16 @@
   border: 0;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.entry-block.is-primary {
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+}
+
+.entry-block.is-secondary {
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
 }
 
 .entry-block-label {
@@ -99,17 +117,17 @@
 /* The seam is the only line between them, and it belongs to the accent. */
 .entry-block.is-secondary {
   border-left: 1px solid var(--accent);
-  background: rgba(77, 107, 254, 0.1);
+  background: rgb(26 115 232 / 10%);
   color: var(--accent);
 }
 
 .entry-block.is-secondary:hover {
-  background: rgba(77, 107, 254, 0.18);
+  background: rgb(26 115 232 / 18%);
 }
 
 /* The block is the drop target, so it answers a file being carried over it. */
 .entry-block.is-secondary[data-drop-active="true"] {
-  background: rgba(77, 107, 254, 0.26);
+  background: rgb(26 115 232 / 26%);
 }
 
 .entry-block:focus-within,
@@ -168,7 +186,8 @@
   overflow-x: auto;
   padding: 0 14px;
   border: 1px solid var(--line);
-  background: var(--canvas-sunken);
+  border-radius: var(--r-md);
+  background: var(--canvas-raised);
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: 14px;
@@ -180,13 +199,11 @@
   flex: none;
   padding: 0 16px;
   border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
   background: var(--canvas);
   color: var(--ink);
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 13.5px;
 }
 
 /* A pointer that is not a finger can take the tighter target. */

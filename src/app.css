@@ -30,7 +30,7 @@
  */
 .drop-glow {
   --drop-reach: 15%;
-  --drop-tint: rgba(77, 107, 254, 0.22);
+  --drop-tint: rgb(26 115 232 / 22%);
 
   position: fixed;
   z-index: 5;
@@ -78,9 +78,9 @@
 /* ========================================================== application bar */
 
 /*
- * Shared by the home screen and the licences page. It is the application's bar,
- * not either page's, which is why it lives with the shell rather than with one
- * of its users.
+ * Shared by every surface. It is the application's bar, not any page's, which is
+ * why it lives with the shell rather than with one of its users, and why the brand
+ * tile and the links are defined once here.
  */
 .top-bar {
   position: relative;
@@ -88,39 +88,78 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  min-height: 60px;
-  padding: 0 clamp(18px, 3vw, 32px);
+  gap: 16px;
+  min-height: 64px;
+  padding: 0 clamp(14px, 2.6vw, 24px);
   padding-top: env(safe-area-inset-top);
 }
 
 .top-bar-group {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
+  min-width: 0;
 }
 
+/*
+ * The mark sits on the assistant gradient, which is the one place this product uses
+ * more than one colour. It is also the mark beside anything the application says in
+ * the conversation, so the two read as the same speaker.
+ */
 .brand-mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  background: var(--ink);
-  color: var(--canvas);
+  border-radius: var(--r-xs);
+  background: var(--mark-gradient);
+  color: #ffffff;
+}
+
+.brand-mark svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .brand-name {
-  font-size: 15px;
-  font-weight: 720;
-  letter-spacing: -0.02em;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * Not a control: there is no menu behind it, and it carries no chevron to suggest
+ * one. It is the state of the thing the page is for, in the place a chat header
+ * usually puts the model it is talking to.
+ */
+.model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--canvas-raised);
+  color: var(--ink-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.model-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
 }
 
 .top-bar-back {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   border: 0;
+  border-radius: var(--r-xs);
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -131,10 +170,10 @@
 }
 
 .top-bar-title {
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 720;
-  letter-spacing: -0.02em;
+  color: var(--ink-muted);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -144,25 +183,27 @@
 .top-bar-links {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 4px;
 }
 
 .top-bar-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 44px;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  color: var(--ink-muted);
+  font-size: 14px;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .top-bar-link:hover {
-  color: var(--accent);
+  background: var(--canvas-raised);
+  color: var(--ink);
 }
 
 .top-bar-link-arrow {
-  font-size: 9px;
+  font-size: 11px;
 }

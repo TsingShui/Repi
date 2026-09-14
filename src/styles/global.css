@@ -1,67 +1,94 @@
 /*
  * Repi design tokens.
  *
- * Direction: a quiet instrument. Sharp geometry, one accent, thin rules.
- * Green communicates "local / safe", amber is reserved for in-progress work,
- * red only for errors. Geometry stays square: no rounded corners.
+ * Direction: the assistant surfaces people already use, skinned for this product.
+ * That means a soft geometry — capsules and generous radii — one blue accent, and
+ * a surface tone a step off the page rather than hairlines everywhere. The screen
+ * this application opens on is a conversation, and a conversation that looks like
+ * the ones people know is one they do not have to learn.
+ *
+ * The earlier direction was the opposite: sharp geometry, no rounded corners, a
+ * hairline on everything. It was written for a workspace of tables and tabs, which
+ * has been removed. Square corners on a rounded shell would be two products, so the
+ * geometry moved with the product.
+ *
+ * Green still communicates "local / safe", amber is in-progress work, red is only
+ * for errors. Type is the platform's: no webfont is fetched, because the only
+ * request this product makes to the network is the model request.
  */
 
 :root {
   color-scheme: light;
 
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-ui: "Google Sans", "Google Sans Text", "Product Sans", Roboto, "Helvetica Neue",
+    Arial, system-ui, sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 
   --canvas: #ffffff;
   /* Space-separated RGB, so gradients can build rgba() from the same token. */
   --canvas-rgb: 255 255 255;
-  --canvas-sunken: #fafbfc;
-  --canvas-raised: #f3f5f7;
-  --line: #e6e8ec;
-  --line-strong: #d3d7dd;
+  --canvas-sunken: #f8fafd;
+  /* Anything the user can put something into: a composer, a bubble, a card. */
+  --canvas-raised: #eff3f9;
+  --line: #dfe3ea;
+  --line-strong: #c4c7c5;
 
-  --ink: #1f2329;
-  --ink-muted: #6b7280;
-  --ink-faint: #9aa1ab;
+  --ink: #1f1f1f;
+  --ink-muted: #444746;
+  --ink-faint: #747775;
 
-  --accent: #4d6bfe;
+  --accent: #1a73e8;
   --accent-ink: #ffffff;
-  --accent-soft: #eef1ff;
+  --accent-soft: #e8f0fe;
 
-  --local: #2f8f6b;
-  --working: #b7791f;
-  --danger: #c2503f;
+  --local: #188038;
+  --working: #e37400;
+  --danger: #d93025;
 
-  --focus: #4d6bfe;
+  --focus: #1a73e8;
+
+  /* One radius scale, so a capsule is not a number someone invented on the spot. */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-capsule: 28px;
+  --r-pill: 999px;
+
   --shadow-raised: 0 1px 2px rgb(31 35 41 / 6%);
-  --panel-lift: 0 8px 24px rgb(31 35 41 / 14%);
+  --shadow-composer: 0 1px 3px rgb(60 64 67 / 8%), 0 4px 12px rgb(60 64 67 / 6%);
+  --panel-lift: 0 8px 24px rgb(60 64 67 / 18%);
   --scrim: rgb(31 35 41 / 28%);
+
+  /* The assistant mark, and the one place the product uses more than one colour. */
+  --mark-gradient: linear-gradient(135deg, #4285f4, #9b72cb 52%, #d96570);
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
 
-  --canvas: #151719;
-  --canvas-rgb: 21 23 25;
-  --canvas-sunken: #181a1d;
-  --canvas-raised: #1d2023;
-  --line: #30343a;
-  --line-strong: #41464d;
+  --canvas: #1b1b1b;
+  --canvas-rgb: 27 27 27;
+  --canvas-sunken: #1f1f1f;
+  --canvas-raised: #282a2c;
+  --line: #333537;
+  --line-strong: #444746;
 
-  --ink: #eceef0;
-  --ink-muted: #999ea5;
-  --ink-faint: #656b73;
+  --ink: #e3e3e3;
+  --ink-muted: #c4c7c5;
+  --ink-faint: #8e918f;
 
-  --accent: #8195ff;
-  --accent-ink: #12141a;
-  --accent-soft: #252b45;
+  --accent: #8ab4f8;
+  --accent-ink: #202124;
+  --accent-soft: #2a3a5e;
 
   --local: #75bea4;
   --working: #dfa05d;
   --danger: #e4826f;
 
-  --focus: #8195ff;
+  --focus: #8ab4f8;
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-composer: 0 1px 3px rgb(0 0 0 / 30%), 0 4px 12px rgb(0 0 0 / 22%);
   --panel-lift: 0 10px 28px rgb(0 0 0 / 45%);
   --scrim: rgb(0 0 0 / 45%);
 }

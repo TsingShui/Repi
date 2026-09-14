@@ -9,8 +9,8 @@ export type ChatLine =
   | { readonly kind: "you"; readonly text: string }
   /**
    * The application speaking about itself: what it recognised, what it cannot do,
-   * what it is waiting for. It is not a model's answer, and the transcript says so
-   * rather than letting the two blur.
+   * what it is waiting for. It is not a model's answer, and the transcript tells
+   * them apart rather than letting the two blur.
    */
   | { readonly kind: "note"; readonly text: string }
   | {
@@ -45,23 +45,46 @@ function analyserSentence(engine: EngineId | null): string {
 }
 
 /**
+ * The platform picker, behind a label that acts as the control.
+ *
+ * A component rather than a shared JSX value: a JSX value is a real DOM node, so
+ * rendering the same one in two places would move it out of the first.
+ */
+function FileInput(props: { readonly onPick: (file: File | undefined) => void }) {
+  return (
+    <input
+      class="visually-hidden"
+      type="file"
+      onChange={(event) => {
+        const picked = event.currentTarget.files?.[0];
+        event.currentTarget.value = "";
+        props.onPick(picked);
+      }}
+    />
+  );
+}
+
+/**
  * The conversation, which is the home surface.
  *
- * The shape is the one a chat interface has settled on: a column, a transcript that
- * scrolls, and a composer pinned under it. What this build can honestly put in the
- * transcript is narrow — no model is connected, so nothing answers — and the page
- * says that instead of showing a typing indicator over nothing.
+ * Two states share one DOM: with nothing said yet the column is centred with a
+ * greeting above the composer and two things to try under it, and once there is a
+ * transcript it falls back to the top with the composer docked. The same composer
+ * element is used for both, so sending the first message does not move the element
+ * the caret is in — which is why this is one tree with a state attribute rather
+ * than two trees behind a `Show`.
  */
 export function ChatScreen(props: ChatScreenProps) {
   const [text, setText] = createSignal("");
   let scroller: HTMLDivElement | undefined;
   let input: HTMLTextAreaElement | undefined;
 
+  const empty = () => props.lines.length === 0;
+
   /*
    * Follow the end of the transcript. Unconditionally for now: a transcript this
-   * build produces is short, and holding position while someone reads would need to
-   * tell "user scrolled up" apart from "user is at the end", which needs the real
-   * message list to be worth doing.
+   * build produces is short, and holding position while someone reads would mean
+   * telling "user scrolled up" apart from "user is at the end".
    */
   createEffect(
     () => props.lines.length,
@@ -90,7 +113,11 @@ export function ChatScreen(props: ChatScreenProps) {
     }
   };
 
-
+  /*
+   * `onPick` is passed down rather than closed over: `FileInput` is rendered twice —
+   * once in the composer, once behind the suggestion — and a component is called
+   * per use, while a JSX value would be one node moved between them.
+   */
 
   return (
     <>
@@ -98,6 +125,15 @@ export function ChatScreen(props: ChatScreenProps) {
         <div class="top-bar-group">
           <BrandMark />
           <span class="brand-name">Repi</span>
+          {/*
+            The state of the thing the page is for, where a chat header usually puts
+            the model it is talking to. A pill and not a control: there is no menu
+            behind it, and no chevron pretending there is.
+          */}
+          <span class="model-pill" data-testid="model-pill">
+            <span class="model-dot" aria-hidden="true" />
+            No model
+          </span>
         </div>
         <nav class="top-bar-links" aria-label="About this project">
           <a class="top-bar-link" href="#/about" data-testid="about-link">
@@ -109,15 +145,17 @@ export function ChatScreen(props: ChatScreenProps) {
         </nav>
       </header>
 
-      <main class="chat">
+      <main class="chat" data-empty={empty() ? "true" : "false"}>
         <div class="chat-scroll" ref={scroller}>
           <div class="chat-column" role="log" aria-live="polite" data-testid="transcript">
-            <Show when={props.lines.length === 0}>
+            <Show when={empty()}>
               <section class="chat-welcome">
-                <h1 class="chat-title">Drop a binary, or ask about one.</h1>
+                <h1 class="chat-greeting">
+                  What are we <em>looking at</em>?
+                </h1>
                 <p class="chat-lede">
-                  Analysis runs on this device. No model is connected yet, so the conversation does not
-                  answer — dropping a file reports what it recognised and stops there.
+                  Analysis runs on this device. Drop a binary and I will say what it is — the
+                  conversation itself does not answer yet.
                 </p>
               </section>
             </Show>
@@ -135,24 +173,34 @@ export function ChatScreen(props: ChatScreenProps) {
 
                   <Show when={line.kind === "note" ? line : null}>
                     {(note) => (
-                      <div class="line-note">
-                        <span class="line-from">REPI</span>
-                        <p class="line-text">{note().text}</p>
+                      <div class="line-repi">
+                        <span class="line-avatar" aria-hidden="true">
+                          R
+                        </span>
+                        <div class="line-body">
+                          <p class="line-from">Repi</p>
+                          <p class="line-text">{note().text}</p>
+                        </div>
                       </div>
                     )}
                   </Show>
 
                   <Show when={line.kind === "file" ? line : null}>
                     {(file) => (
-                      <article class="file-card" data-analysable={file().engine ? "true" : "false"}>
-                        <p class="file-name">{file().name}</p>
-                        <p class="file-facts">
-                          {file().format} · {file().detail} · {formatBytes(file().size)}
-                        </p>
-                        <p class="file-engine">
-                          {analyserSentence(file().engine)}
-                        </p>
-                      </article>
+                      <div class="line-repi">
+                        <span class="line-avatar" aria-hidden="true">
+                          R
+                        </span>
+                        <div class="line-body">
+                          <article class="file-card" data-analysable={file().engine ? "true" : "false"}>
+                            <p class="file-name">{file().name}</p>
+                            <p class="file-facts">
+                              {file().format} · {file().detail} · {formatBytes(file().size)}
+                            </p>
+                            <p class="file-badge">{analyserSentence(file().engine)}</p>
+                          </article>
+                        </div>
+                      </div>
                     )}
                   </Show>
                 </div>
@@ -161,27 +209,19 @@ export function ChatScreen(props: ChatScreenProps) {
           </div>
         </div>
 
-        <form
-          class="composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <div class="composer-column">
+        <div class="composer-column">
+          <form
+            class="composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
             <div class="composer-box">
               <label class="composer-attach" aria-label="Attach a binary">
-                <input
-                  class="visually-hidden"
-                  type="file"
-                  onChange={(event) => {
-                    const picked = event.currentTarget.files?.[0];
-                    event.currentTarget.value = "";
-                    props.onPick(picked);
-                  }}
-                />
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 3v10M3 8h10" />
+                <FileInput onPick={props.onPick} />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
                 </svg>
               </label>
 
@@ -214,22 +254,40 @@ export function ChatScreen(props: ChatScreenProps) {
                 aria-label="Send"
                 data-testid="send"
               >
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 13V3M4 7l4-4 4 4" />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
                 </svg>
               </button>
             </div>
+          </form>
 
-            {/*
-              Under the box rather than in it, and always visible: this is the claim
-              the product is built on, and a claim that is only made on the welcome
-              screen is a claim the user stops being able to check.
-            */}
-            <p class="composer-note">
-              No model is connected yet — nothing you type, and no file you drop, leaves this device.
-            </p>
-          </div>
-        </form>
+          {/*
+            Two things that work today, rather than suggested prompts this build
+            cannot answer. They go away once the conversation starts.
+          */}
+          <Show when={empty()}>
+            <div class="suggestions">
+              <label class="suggestion">
+                <FileInput onPick={props.onPick} />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Open a binary
+              </label>
+              <a class="suggestion" href="#/about">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 11v5M12 8h.01" />
+                </svg>
+                About Repi
+              </a>
+            </div>
+          </Show>
+
+          <p class="composer-note">
+            No model is connected — nothing you type, and no file you drop, leaves this device.
+          </p>
+        </div>
       </main>
     </>
   );

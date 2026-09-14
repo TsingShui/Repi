@@ -1,8 +1,14 @@
 /*
- * The conversation: a column, a transcript that scrolls, a composer under it.
+ * The conversation.
  *
- * Square geometry and one accent, like the rest of the application: the shape is
- * borrowed from the chat interfaces people already use, the skin is this product's.
+ * The shape is the one the assistant surfaces have settled on — a wide centred
+ * column, a transcript that scrolls, and a capsule composer — because that is the
+ * shape a conversation is expected to have here. Two states, one DOM: with nothing
+ * said yet the column is centred in the window with a greeting above the composer
+ * and a couple of things to try under it; once there is a transcript the column
+ * falls back to the top and the composer docks to the bottom. It is the same
+ * composer in both, so sending the first message does not move the element the
+ * caret is in.
  */
 
 .chat {
@@ -13,46 +19,68 @@
   z-index: 1;
 }
 
+/* Nothing said yet: the block sits a little above the middle, as a greeting does. */
+.chat[data-empty="true"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 5vh;
+}
+
 .chat-scroll {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-/* One measure for the transcript and the composer, so the box sits under the text. */
+/* One measure for the transcript, the composer and the greeting. */
 .chat-column,
 .composer-column {
-  width: min(760px, 100%);
+  width: min(780px, 100%);
   margin: 0 auto;
-  padding-inline: clamp(16px, 3vw, 32px);
+  padding-inline: clamp(16px, 4vw, 28px);
 }
 
 .chat-column {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-block: clamp(24px, 6vh, 72px) 24px;
+  gap: 26px;
+  /* Pushes a short transcript down to the composer. An auto margin rather than
+     `justify-content: flex-end` on the scroll container, which cuts off the top of
+     the column once it overflows. */
+  margin-top: auto;
+  padding-block: 24px;
 }
 
-/* ============================================================== welcome */
-
-.chat-welcome {
-  padding-block: clamp(12px, 8vh, 96px);
+.chat[data-empty="true"] .chat-column {
+  padding-block: 0 28px;
 }
 
-.chat-title {
-  max-width: 24ch;
-  font-size: clamp(24px, 4.4vw, 34px);
-  font-weight: 680;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+/* ============================================================== greeting */
+
+.chat-greeting {
+  font-size: clamp(28px, 4.2vw, 38px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.14;
+}
+
+/* The one place more than one colour is used: the assistant's own mark. */
+.chat-greeting em {
+  font-style: normal;
+  background: var(--mark-gradient);
+  background-clip: text;
+  color: transparent;
 }
 
 .chat-lede {
-  max-width: 56ch;
+  max-width: 62ch;
   margin-top: 14px;
   color: var(--ink-muted);
   font-size: 15px;
+  line-height: 1.55;
 }
 
 /* ========================================================== transcript */
@@ -66,31 +94,52 @@
 }
 
 .line-bubble {
-  max-width: min(85%, 58ch);
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  background: var(--accent-soft);
-  font-size: 15px;
+  max-width: min(80%, 62ch);
+  padding: 12px 18px;
+  border-radius: var(--r-lg);
+  background: var(--canvas-raised);
+  font-size: 16px;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.line-note {
+/* What the application says about itself, beside the product's own mark. */
+.line-repi {
   display: grid;
-  gap: 4px;
-  max-width: 68ch;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.line-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--r-xs);
+  background: var(--mark-gradient);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.line-body {
+  min-width: 0;
 }
 
 .line-from {
   color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .line-text {
-  color: var(--ink-muted);
-  font-size: 15px;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -98,65 +147,65 @@
 /* =========================================================== file card */
 
 /*
- * What arrived, and whether anything here can read it. The second half is the
- * point: a file this build cannot analyse says so on the card, rather than leaving
- * the user to find out from silence.
+ * What arrived, and whether anything here can read it. The badge is the point: a
+ * file this build cannot analyse says so on the card rather than leaving the user
+ * to find out from silence.
  */
 .file-card {
-  max-width: 68ch;
-  padding: 12px 14px;
-  border: 1px solid var(--line-strong);
-  border-left-width: 3px;
-  border-left-color: var(--ink-faint);
-  background: var(--canvas-sunken);
-}
-
-.file-card[data-analysable="true"] {
-  border-left-color: var(--local);
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--canvas-raised);
 }
 
 .file-name {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
 .file-facts {
-  margin-top: 6px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-
-.file-engine {
-  margin-top: 10px;
+  margin-top: 4px;
   color: var(--ink-faint);
   font-size: 13px;
 }
 
-.file-card[data-analysable="true"] .file-engine {
+.file-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 12px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--ink-muted);
+  font-size: 12.5px;
+}
+
+.file-card[data-analysable="true"] .file-badge {
+  background: #e6f4ea;
   color: var(--local);
 }
 
 /* ============================================================ composer */
 
-.composer {
-  border-top: 1px solid var(--line);
-  background: var(--canvas);
-}
-
+/*
+ * The dock is opaque so a transcript scrolling under it disappears cleanly instead
+ * of colliding with the capsule.
+ */
 .composer-column {
   padding-block: 12px calc(12px + env(safe-area-inset-bottom));
+  background: var(--canvas);
 }
 
 .composer-box {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
   padding: 6px;
-  border: 1px solid var(--line-strong);
-  background: var(--canvas-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-capsule);
+  background: var(--canvas-raised);
+  box-shadow: var(--shadow-composer);
 }
 
 .composer-box:focus-within {
@@ -167,21 +216,23 @@
 .composer-send {
   display: grid;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 0;
+  border-radius: var(--r-pill);
   padding: 0;
 }
 
 .composer-attach {
   position: relative;
   background: transparent;
-  color: var(--ink-faint);
+  color: var(--ink-muted);
 }
 
 .composer-attach:hover {
-  color: var(--accent);
+  background: rgb(0 0 0 / 6%);
+  color: var(--ink);
 }
 
 .composer-send {
@@ -190,31 +241,34 @@
 }
 
 .composer-send:disabled {
-  background: var(--canvas-raised);
+  background: var(--canvas);
   color: var(--ink-faint);
   cursor: default;
 }
 
 .composer-attach svg,
 .composer-send svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: square;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .composer-input {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
+  min-height: 44px;
   max-height: 200px;
-  padding: 9px 4px;
+  padding: 12px 6px;
   border: 0;
   background: transparent;
+  color: var(--ink);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.4;
   resize: none;
 }
 
@@ -226,19 +280,51 @@
   color: var(--ink-faint);
 }
 
-.composer-note {
-  margin-top: 8px;
-  color: var(--ink-faint);
-  font-size: 12px;
-  text-align: center;
+/* ======================================================== suggestions */
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.suggestion:hover {
+  background: var(--canvas-raised);
+  color: var(--ink);
+}
+
+.suggestion svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 /*
- * The 44px floor, and nothing else changes for a coarse pointer: the two controls
- * in the box are the only targets here that are not already text-sized.
+ * The claim the product is built on, under the box and always visible: made once
+ * at the top of a scroll it would be a claim the user stops being able to check.
  */
-.app[data-pointer="coarse"] .composer-attach,
-.app[data-pointer="coarse"] .composer-send {
-  width: 44px;
-  height: 44px;
+.composer-note {
+  margin-top: 14px;
+  color: var(--ink-faint);
+  font-size: 12.5px;
+  text-align: center;
 }
