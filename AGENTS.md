@@ -35,6 +35,14 @@ Run these from the repository root. Nothing here needs the network except
 | `npm run build:kuna` | Builds the real decompiler from a Kuna checkout. See *The engines* below. |
 | `npm run build:rasc` | Rebuilds the APK/DEX decompiler from a Rasc checkout. See *The engines* below. |
 
+Deploying is manual and only manual: `.github/workflows/deploy.yml` has no push
+trigger, because a deploy builds both engines out of their own repositories before
+it publishes anything. Ask for one when one is wanted:
+
+```sh
+gh workflow run deploy.yml --repo TsingShui/Repi
+```
+
 **One environment note, because it cost a session an iteration.** `npm run verify` and
 `npm run smoke` need a Chrome that actually starts. On one machine the browser in
 `~/.cache/repi-chrome` is missing ten shared libraries - libatk, libatk-bridge, libatspi,

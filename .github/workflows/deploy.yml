@@ -6,15 +6,15 @@ name: Deploy Repi
 # deploy cleanly and every native binary and every APK would report the engine as
 # missing — a working site with two dead features, which is the failure this
 # pipeline exists to prevent.
+#
+# Manual only, deliberately. A deploy here builds two wasm toolchains out of their
+# own repositories and publishes an artifact: minutes of somebody else's machine
+# for a thing that should be asked for rather than done by a push. Run it when a
+# deploy is wanted:
+#
+#   gh workflow run deploy.yml --repo TsingShui/Repi
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    # Everything in this repository is the deployed site, so there is no path list to
-    # keep in step with a layout: a documentation-only edit deploys, which is a
-    # minute of CI rather than a wrong build.
-    paths:
-      - "**"
 
 permissions:
   contents: read
