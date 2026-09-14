@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
 import { CREDITS, PROJECT } from "./credits";
 import { StructureField } from "./structure-field";
@@ -157,7 +157,21 @@ export function AboutScreen(props: AboutScreenProps) {
                     </a>
                     <span class="credit-license">{credit.license}</span>
                   </div>
-                  <p class="credit-note">{credit.note}</p>
+                  <p class="credit-note">
+                    {credit.note}
+                    <Show when={credit.derivedFrom}>
+                      {(from) => (
+                        <>
+                          {" "}
+                          A rewrite of{" "}
+                          <a href={from().url} rel="noreferrer">
+                            {from().name}
+                          </a>
+                          .
+                        </>
+                      )}
+                    </Show>
+                  </p>
                 </div>
               )}
             </For>

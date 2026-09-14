@@ -25,6 +25,13 @@ export interface Credit {
   readonly license: string;
   readonly url: string;
   readonly note: string;
+  /**
+   * The project this one was written from, when that is part of what it is. It is a
+   * link rather than a row of its own: a fork is not something the reader receives,
+   * and a second name with a second licence column for it made the list look like
+   * five shipped things when it is four.
+   */
+  readonly derivedFrom?: { readonly name: string; readonly url: string };
 }
 
 /** Repi's own licence. Apache-2.0, the same one every engine behind it uses. */
@@ -46,11 +53,12 @@ export const CREDITS: readonly Credit[] = [
     license: "Apache-2.0",
     url: "https://github.com/TsingShui/rasc",
     note: "The Android engine: classes, methods and code out of an APK or a DEX file.",
+    derivedFrom: { name: "ASC", url: "https://github.com/MG1937/ASC" },
   },
   {
-    name: "ASC",
-    license: "Apache-2.0",
-    url: "https://github.com/MG1937/ASC",
-    note: "An Android decompiler, and the one Rasc was written from.",
+    name: "Pi Agent",
+    license: "MIT",
+    url: "https://github.com/earendil-works/pi",
+    note: "The agent layer this application is being built on: the loop that runs tool calls and keeps their state, and the client that speaks to a model provider. Nothing is wired to it yet.",
   },
 ];

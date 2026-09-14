@@ -91,7 +91,13 @@ command rather than doing nothing visible.
 
 **What it is built on.** What this application redistributes and the terms each part
 comes under, with Repi's own licence first: the engines whose binaries ship with the
-page, then the project one of them was rewritten from. Four rows, flat.
+page, and the agent layer the surface is being built on. Four rows, flat. A fork is a
+link inside the row it belongs to rather than a row — ASC is named in Rasc's note,
+because a fork is not something the reader receives, and a second name with its own
+licence column made four shipped things look like five.
+
+One row states its tense: Pi Agent is what the agent surface will be built on, and the
+note says nothing is wired to it yet.
 
 It has been three lists. The first grouped everything four ways — in the page, beside a
 file, used to build it — and said where each licence file could be found; the second

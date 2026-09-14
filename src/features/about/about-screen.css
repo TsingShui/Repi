@@ -177,3 +177,12 @@
   font-size: 14px;
   line-height: 1.55;
 }
+
+.credit-note a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.credit-note a:hover {
+  text-decoration: underline;
+}
