@@ -77,8 +77,10 @@ became the product's column.
 
 Three sections:
 
-**The hero.** The product's line and one paragraph saying what the application does
-with a file and how far it currently goes. It carries no control and lists nothing: what it can recognise belongs to the moment a file is in front of it, not to a
+**The hero.** The product's line — where the work happens, in one claim — and one
+paragraph introducing the product: open source, for the edge, everything runs on the
+reader's own machine except the text sent to the model they connect. It carries no
+control and lists nothing: what it can recognise belongs to the moment a file is in front of it, not to a
 page you read first. The first version had the picker and the drop as two
 halves of one capsule, which was the right control on a landing page whose only job was
 to take a file; on a page you read, a call to action in the middle of the prose is a

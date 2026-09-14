@@ -93,9 +93,8 @@ export function AboutScreen(props: AboutScreenProps) {
           <section class="about-hero">
             <h1 class="about-title">Your device is the edge.</h1>
             <p class="about-lede">
-              The reverse-engineering command line, rebuilt for the browser. Drop a binary into the
-              conversation and it reports what the file is — format, architecture, container — and that
-              is where this build stops: nothing reads inside it yet.
+              Repi is an open-source reverse-engineering platform for the edge. Everything runs on
+              your own machine, except the text sent to your own model.
             </p>
           </section>
 
