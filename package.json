@@ -1,0 +1,30 @@
+{
+  "name": "@repi/app",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Repi \u2014 browser-local reverse-engineering workspace for tablets.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node ./scripts/ship-licence.mjs",
+    "preview": "vite preview --port 4173",
+    "smoke": "node ./scripts/smoke.mjs",
+    "verify": "node ./scripts/verify.mjs",
+    "check:analysis": "node ./scripts/run-analysis-check.mjs",
+    "build:kuna": "node ./scripts/build-kuna.mjs",
+    "build:rasc": "node ./scripts/build-rasc.mjs"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.8",
+    "solid-js": "2.0.0-rc.8"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vite-plugin-solid": "3.0.0-next.27"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

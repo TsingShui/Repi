@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repi · 工作区 · 标签粒度跟着语言走</title>
+  <!--
+    标签的粒度不是一条固定规则，而是跟着语言走：
+
+      · Java（Rasc / DEX）—— 最小自足单位是类，所以一个类一个标签，
+        点类里的某个方法会切到那个类并在类体内标出这个方法。
+      · Native（Kuna）—— 没有类，函数就是单位，所以一个函数一个标签。
+
+    STRINGS 和 META 的每一组是单例文档，各占一个标签。
+
+    自包含：无字体、脚本、图片或网络请求。
+  -->
+  <style>
+    :root { --page-bg: #e9eaec; --page-ink: #1d2024; --page-muted: #7a8089; --page-line: #d3d6da; color-scheme: light; }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+
+    body {
+      min-width: 320px;
+      background: var(--page-bg);
+      color: var(--page-ink);
+      font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    .page-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 24px clamp(14px, 3vw, 32px) 16px;
+      border-bottom: 1px solid var(--page-line);
+    }
+
+    .page-head h1 { margin: 0 0 4px; font-size: 19px; font-weight: 650; letter-spacing: -0.02em; }
+    .page-head p { max-width: 78ch; margin: 0; color: var(--page-muted); font-size: 12.5px; line-height: 1.6; }
+    .page-head p + p { margin-top: 6px; }
+    .page-head b { color: #1d2024; }
+
+    .tools { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .tools button {
+      min-height: 44px;
+      padding: 0 15px;
+      border: 1px solid var(--page-line);
+      border-radius: 7px;
+      background: #fff;
+      color: #4a5058;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .tools button:hover { border-color: #b6bac0; }
+
+    .stage { display: grid; padding: 22px clamp(14px, 3vw, 32px) 70px; justify-items: center; }
+    .frame-wrap { overflow: hidden; }
+    .frame { width: 1180px; height: 820px; transform-origin: top left; overflow: hidden; box-shadow: 0 14px 40px rgb(24 28 33 / 18%); }
+
+    /* ==================================================== C′ 皮肤 */
+
+    .app {
+      position: relative;
+      display: grid;
+      width: 1180px;
+      height: 820px;
+      grid-template-rows: 36px 28px minmax(0, 1fr);
+      grid-template-columns: 268px minmax(0, 1fr);
+      background: #fff;
+      color: #23262a;
+      font: 12px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    .bar {
+      display: flex;
+      grid-column: 1 / -1;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px;
+      border-bottom: 1px solid #c4c7cb;
+      background: #e8e8e8;
+    }
+
+    .bar .mark { font-weight: 700; }
+    .bar .file { font-weight: 600; }
+    .bar .meta { color: #5a5f66; font-size: 10px; }
+    .bar .spacer { flex: 1; }
+    .bar .local { display: inline-flex; align-items: center; gap: 5px; color: #2f7a5c; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
+    .bar .local i { width: 6px; height: 6px; border-radius: 50%; background: #2f7a5c; }
+
+    .bar .more {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #c4c7cb;
+      background: #fff;
+      color: #5a5f66;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .menu {
+      position: absolute;
+      z-index: 20;
+      top: 32px;
+      right: 8px;
+      min-width: 200px;
+      border: 1px solid #c4c7cb;
+      background: #fff;
+      box-shadow: 0 8px 20px rgb(32 36 42 / 18%);
+    }
+
+    .menu button {
+      display: flex;
+      width: 100%;
+      min-height: 44px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 12px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+
+    .menu button:hover { background: #f0f0f0; }
+    .menu kbd { color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+
+    /* 来源切换：DEX 是一个条目，native 每个 so 一条 —— 分析单元不是文件 */
+    .source { display: flex; grid-column: 1 / -1; align-items: center; gap: 8px; padding: 0 8px; border-bottom: 1px solid #c4c7cb; background: #f4f4f4; }
+
+    .source-current {
+      display: flex;
+      min-height: 28px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .source-current .detail { color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 400; }
+    .source-current .caret { color: #8d9298; font-size: 9px; }
+
+    .source-picker { position: absolute; z-index: 30; top: 60px; left: 8px; min-width: 230px; border: 1px solid #c4c7cb; background: #fff; box-shadow: 0 8px 20px rgb(32 36 42 / 18%); }
+    .source-picker .group { padding: 6px 10px 4px; color: #8d9298; font-size: 10px; letter-spacing: 0.06em; }
+    .source-picker button { display: flex; width: 100%; min-height: 28px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 10px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+    .source-picker button:hover { background: #f0f0f0; }
+    .source-picker button[aria-selected="true"] { background: #ccd6e8; }
+    .source-picker .detail { color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+
+    /* ============================================================== 左栏 */
+
+    .sections { display: flex; min-height: 0; flex-direction: column; border-right: 1px solid #c4c7cb; background: #f4f4f4; }
+    .section { display: flex; min-height: 0; flex-direction: column; border-bottom: 1px solid #c4c7cb; }
+    .section[data-open="true"] { flex: 1; }
+
+    .section-head {
+      display: flex;
+      width: 100%;
+      min-height: 30px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      border: 0;
+      background: #e8e8e8;
+      color: #23262a;
+      cursor: pointer;
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-align: left;
+    }
+
+    .section-head .twist { width: 10px; color: #8d9298; }
+    .section-head .count { margin-left: auto; color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-weight: 400; letter-spacing: 0; }
+    .section-head[aria-expanded="true"] { background: #dfe3e8; }
+    .section-head.is-entry { cursor: pointer; }
+    .section-head.is-entry:hover { background: #dfe3e8; }
+    .section-head.is-entry .twist { visibility: hidden; }
+
+    .section-body { display: none; min-height: 0; overflow: auto; }
+    .section[data-open="true"] .section-body { display: block; }
+
+    .row {
+      display: flex;
+      width: 100%;
+      height: 28px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+
+    .row:hover { background: #e9e9e9; }
+    .row[aria-selected="true"] { background: #ccd6e8; }
+    .row .twist { width: 10px; flex: none; color: #8d9298; font-size: 9px; }
+    .row .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row[data-kind="package"] .label { font-weight: 700; }
+    .row[data-kind="class"] .label { font-weight: 600; }
+    .row[data-kind="method"] .label,
+    .row[data-kind="function"] .label { font-family: ui-monospace, Menlo, monospace; }
+    .row .detail { flex: none; color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-size: 10px; }
+    .row[aria-selected="true"] .detail { color: #3a4553; }
+
+    /* ============================================================== 右栏 */
+
+    .main { display: grid; min-height: 0; grid-template-rows: 32px minmax(0, 1fr); background: #fff; }
+
+    /* 标签多了会横向滚，不会挤成一团 */
+    .tabs { display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid #c4c7cb; background: #f4f4f4; scrollbar-width: thin; }
+    .tabs::-webkit-scrollbar { height: 6px; }
+    .tabs::-webkit-scrollbar-thumb { background: #c4c7cb; }
+
+    .tab { display: flex; flex: none; align-items: center; border-right: 1px solid #c4c7cb; background: transparent; }
+    .tab[aria-selected="true"] { background: #fff; box-shadow: inset 0 -2px 0 #6b86b8; }
+
+    .tab .pick {
+      display: flex;
+      max-width: 220px;
+      min-height: 31px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px 0 10px;
+      overflow: hidden;
+      border: 0;
+      background: transparent;
+      color: #5a5f66;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tab[aria-selected="true"] .pick { color: #23262a; }
+    .tab .pick .name { overflow: hidden; text-overflow: ellipsis; }
+    .tab .pick .lang { color: #8d9298; font-family: ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 400; }
+
+    .tab .close {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      margin-right: 4px;
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: #8d9298;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .tab .close:hover { background: #e4e4e4; color: #23262a; }
+
+    .subject { display: grid; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+    .subject > * { min-height: 0; }
+    .doc { display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
+
+    .head { display: flex; align-items: center; gap: 12px; padding: 0 8px; border-bottom: 1px solid #c4c7cb; }
+    .head b { font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; }
+    .head .meta { color: #5a5f66; font-size: 10px; }
+    .head .spacer { flex: 1; }
+
+    .mode { color: #6b86b8; font-family: ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+
+    .code { min-height: 0; overflow: auto; padding: 4px 0; }
+
+    .line {
+      display: flex;
+      gap: 10px;
+      min-height: 17px;
+      padding: 0 8px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      line-height: 17px;
+      white-space: pre;
+    }
+
+    .line .ln { width: 3ch; flex: none; color: #8d9298; text-align: right; user-select: none; }
+
+    /* 类内的分节：类的标签里所有方法都在，选中的那个整段标出来 */
+    .member {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 2px;
+      padding: 3px 8px;
+      border-top: 1px solid #e4e4e4;
+      color: #5a5f66;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .member[data-hit="true"] { border-top-color: #d8b25a; background: #fff6d8; color: #6b4e12; font-weight: 700; }
+    .body-block[data-hit="true"] { background: #fffbe9; }
+
+    .tok-com { color: #8d9298; font-style: italic; }
+    .tok-str { color: #6b4e12; }
+    .tok-ann { color: #7a7f86; }
+    .tok-kw { color: #7a1f8f; }
+    .tok-ty { color: #1f5b8f; }
+    .tok-fn { color: #8f4508; }
+    .tok-num { color: #1f5f52; }
+
+    .panel { min-height: 0; overflow: auto; padding: 8px 12px; }
+    .panel h4 { margin: 0 0 8px; color: #5a5f66; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+    .panel h4 + table { margin-bottom: 18px; }
+    .panel .kv { margin-bottom: 18px; }
+    .panel .kv { display: grid; grid-template-columns: 14ch minmax(0, 1fr); gap: 4px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .panel .kv dt { color: #8d9298; }
+    .panel .kv dd { margin: 0; }
+    .panel table { width: 100%; border-collapse: collapse; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .panel th { padding: 4px 0; border-bottom: 1px solid #c4c7cb; color: #8d9298; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-align: left; }
+    .panel td { padding: 3px 0; border-bottom: 1px solid #ececec; }
+    .panel td.num { text-align: right; color: #5a5f66; }
+    .panel tr[data-hit="true"] td { background: #fff6d8; }
+    .panel tbody tr[data-kind="string"], .panel table tr[data-kind="string"] { cursor: pointer; }
+    .panel table tr[data-kind="string"]:hover td { background: #eef2f8; }
+
+    .empty { display: grid; height: 100%; align-content: center; justify-items: center; gap: 8px; text-align: center; }
+    .empty-label { margin: 0; color: #8d9298; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; }
+    .empty-hint { margin: 0; max-width: 40ch; color: #5a5f66; font-size: 12px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <header class="page-head">
+    <div>
+      <h1>工作区 · 标签粒度跟着语言走</h1>
+      <p>Java 的最小自足单位是类，所以 <b>一个类一个标签</b>，点类里的方法会切到那个类并在类的正文里标出那个方法。Native 没有类，<b>一个函数一个标签</b>。</p>
+      <p>左栏只有类/函数那一棵需要展开；<b>STRINGS 和 META 是直接的条目</b>，点了就开标签 —— 展开它们只会在 268px 里塞一张缩水表，多一次点击而已。META 是一页滚动、三段。</p>
+      <p>试试点 `LoginActivity` 下的两个方法 —— 它们进的是同一个标签，只是高亮换位置；再用左上角切到 `libnotes.so`，同一个操作会开出一个函数标签。</p>
+    </div>
+    <div class="tools">
+      <button type="button" data-action="open-many">再开几个标签</button>
+      <button type="button" data-action="close-all">全部关掉</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="frame-wrap">
+      <div class="frame" id="frame"></div>
+    </div>
+  </main>
+
+  <script>
+    /* ==================================================== Java：以类为单位 */
+
+    const JAVA_METHODS = {
+      "LoginActivity.onCreate": {
+        meta: "method · 218 bytes · 3 references",
+        lines: [
+          "@Override",
+          "protected void onCreate(Bundle savedState) {",
+          "    super.onCreate(savedState);",
+          "    this.binding = ActivityNotesBinding.inflate(getLayoutInflater());",
+          "    setContentView(this.binding.getRoot());",
+          "",
+          "    this.tokenStore = TokenStore.open(this);",
+          "    this.session = SessionManager.restore(this.tokenStore);",
+          "    this.biometricGate = BiometricGate.create(this);",
+          "",
+          "    if (this.session.isOpen()) {",
+          "        startActivity(NotesActivity.intent(this));",
+          "        finish();",
+          "    }",
+          "}",
+        ],
+      },
+      "LoginActivity.authenticate": {
+        meta: "method · 412 bytes · 5 references",
+        lines: [
+          "@Override",
+          "protected Result authenticate(Credentials input) {",
+          "    Token token = this.tokenStore.read();",
+          "    if (token == null || token.isBlank()) {",
+          "        Audit.write(\"expired session\");",
+          "        return Result.expired();",
+          "    }",
+          "",
+          "    Claims claims = Jwt.decode(token.value(), this.signingKey);",
+          "    if (claims == null) {",
+          "        Audit.write(\"invalid signature\");",
+          "        return Result.invalid();",
+          "    }",
+          "",
+          "    if (claims.expiresAt < System.currentTimeMillis()) {",
+          "        return Result.expired();",
+          "    }",
+          "",
+          "    this.session.open(input, claims);",
+          "    DeviceBinding.bind(claims.subject, this.keystore);",
+          "    return Result.ok(this.session.id());",
+          "}",
+        ],
+      },
+      "LoginActivity.onActivityResult": {
+        meta: "method · 96 bytes · 1 reference",
+        lines: [
+          "@Override",
+          "protected void onActivityResult(int request, int result, Intent data) {",
+          "    super.onActivityResult(request, result, data);",
+          "    if (result != RESULT_OK) {",
+          "        Audit.write(\"keystore unavailable\");",
+          "    }",
+          "}",
+        ],
+      },
+      "LoginActivity.refreshToken": {
+        meta: "method · 184 bytes · 2 references",
+        lines: [
+          "void refreshToken() {",
+          "    Token token = this.tokenStore.read();",
+          "    if (token == null) return;",
+          "",
+          "    Response response = this.client.post(\"GET /v1/auth\", token);",
+          "    if (response.isSuccessful()) {",
+          "        this.tokenStore.write(response.token());",
+          "    } else {",
+          "        Audit.write(\"retry budget exhausted\");",
+          "    }",
+          "}",
+        ],
+      },
+    };
+
+    const JAVA_CLASSES = {
+      LoginActivity: {
+        fqn: "com.example.notes.auth.LoginActivity",
+        meta: "class · 4 methods · 912 bytes",
+        methods: ["LoginActivity.onCreate", "LoginActivity.authenticate", "LoginActivity.onActivityResult", "LoginActivity.refreshToken"],
+      },
+      TokenStore: {
+        fqn: "com.example.notes.auth.TokenStore",
+        meta: "class · 9 methods · 1.2 KB",
+        methods: [],
+      },
+      SessionManager: {
+        fqn: "com.example.notes.auth.SessionManager",
+        meta: "class · 22 methods · 3.4 KB",
+        methods: [],
+      },
+    };
+
+    /* ================================================== Native：以函数为单位 */
+
+    const NATIVE_FUNCTIONS = {
+      authenticate_user: {
+        meta: "function · 0x00102bd0 · 184 bytes",
+        lines: [
+          "bool authenticate_user(Session *session, Token *token) {",
+          "    uint64_t now;",
+          "    Claims claims;",
+          "",
+          "    if (session == NULL || token == NULL) {",
+          "        return false;",
+          "    }",
+          "",
+          "    claims = auth_parse_token(token);",
+          "    now = clock_monotonic();",
+          "    if (claims.expiry < now) {",
+          "        audit_write(\"expired session\");",
+          "        return false;",
+          "    }",
+          "",
+          "    session->user_id = claims.subject;",
+          "    return true;",
+          "}",
+        ],
+      },
+      auth_parse_token: {
+        meta: "function · 0x00102e18 · 232 bytes",
+        lines: [
+          "Claims auth_parse_token(Token *token) {",
+          "    Claims claims = {0};",
+          "    uint8_t *cursor = token->value;",
+          "",
+          "    if (base64_decode(cursor, token->length, &claims) != 0) {",
+          "        audit_write(\"invalid signature\");",
+          "        return claims;",
+          "    }",
+          "",
+          "    claims.subject = hmac_sha256(claims.body, token->key);",
+          "    return claims;",
+          "}",
+        ],
+      },
+      clock_monotonic: {
+        meta: "function · 0x001031a4 · 48 bytes",
+        lines: [
+          "uint64_t clock_monotonic(void) {",
+          "    struct timespec ts;",
+          "    clock_gettime(CLOCK_MONOTONIC, &ts);",
+          "    return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;",
+          "}",
+        ],
+      },
+      audit_write: {
+        meta: "function · 0x00103470 · 96 bytes",
+        lines: [
+          "void audit_write(const char *message) {",
+          "    if (audit_sink == NULL) return;",
+          "    mutex_lock(&audit_lock);",
+          "    write(audit_sink->fd, message, strlen(message));",
+          "    mutex_unlock(&audit_lock);",
+          "}",
+        ],
+      },
+      session_open: {
+        meta: "function · 0x0010370c · 128 bytes",
+        lines: [
+          "int session_open(Session *session, const Credentials *input, Claims claims) {",
+          "    if (session->state != SESSION_IDLE) return -1;",
+          "    session->user_id = claims.subject;",
+          "    session->opened_at = clock_monotonic();",
+          "    session->state = SESSION_OPEN;",
+          "    return 0;",
+          "}",
+        ],
+      },
+    };
+
+    /*
+     * 每个分析单元自己的数据：一个 APK 里 DEX 和 .so 的字符串、导入、导出、
+     * 节表都不一样，用同一份数据会让标签看起来像在说谎。
+     */
+    const UNITS = {
+      dex: {
+        id: "dex", kind: "dex", label: "DEX", short: "dex", detail: "classes · dex",
+        navTitle: "CLASSES", navCount: "1,284 methods",
+        strings: [
+          { address: "104020", value: "expired session", xrefs: 2, owner: "LoginActivity.authenticate" },
+          { address: "10408c", value: "invalid signature", xrefs: 5, owner: "LoginActivity.authenticate" },
+          { address: "1040f0", value: "sign in: ", xrefs: 4, owner: "LoginActivity.onCreate" },
+          { address: "104188", value: "keystore unavailable", xrefs: 4, owner: "LoginActivity.onActivityResult" },
+          { address: "1042a4", value: "retry budget exhausted", xrefs: 2, owner: "LoginActivity.refreshToken" },
+          { address: "1042e0", value: "cache/", xrefs: 3, owner: "TokenStore.open" },
+        ],
+        imports: [
+          { name: "android.content.Context", module: "framework" },
+          { name: "android.os.Bundle", module: "framework" },
+          { name: "okhttp3.OkHttpClient", module: "okhttp" },
+          { name: "com.google.gson.Gson", module: "gson" },
+          { name: "javax.crypto.Cipher", module: "framework" },
+          { name: "java.security.KeyStore", module: "framework" },
+        ],
+        exports: [
+          { name: "com.example.notes.api.NotesApi", module: "public" },
+          { name: "com.example.notes.api.Session", module: "public" },
+          { name: "com.example.notes.ui.NotesActivity", module: "public" },
+        ],
+        sections: [
+          ["header", "0x00000000", "112 B"],
+          ["string_ids", "0x00000070", "6.7 KB"],
+          ["type_ids", "0x00001ab0", "2.4 KB"],
+          ["method_ids", "0x00003730", "10.6 KB"],
+          ["code_item", "0x000061b0", "12.9 MB"],
+        ],
+        facts: [
+          ["FORMAT", "DEX 0.35 content"],
+          ["ARCHITECTURE", "Dalvik bytecode"],
+          ["SIZE", "18.4 MB"],
+          ["SHA-256", "174ebea010d0c64003…"],
+          ["WORKER MEMORY", "61 MB"],
+        ],
+      },
+      libnotes: {
+        id: "libnotes", kind: "native", label: "libnotes.so", short: "libnotes.so", detail: "arm64-v8a",
+        navTitle: "FUNCTIONS", navCount: "5 functions",
+        strings: [
+          { address: "104020", value: "expired session", xrefs: 2, owner: "authenticate_user" },
+          { address: "10408c", value: "invalid signature", xrefs: 5, owner: "auth_parse_token" },
+          { address: "1041d0", value: "session restored", xrefs: 2, owner: "session_open" },
+          { address: "1042a4", value: "retry budget exhausted", xrefs: 2, owner: "audit_write" },
+        ],
+        imports: [
+          { name: "malloc", module: "libc.so" },
+          { name: "memcpy", module: "libc.so" },
+          { name: "pthread_create", module: "libc.so" },
+          { name: "clock_gettime", module: "libc.so" },
+          { name: "SSL_read", module: "libssl.so" },
+          { name: "__android_log_print", module: "liblog.so" },
+        ],
+        exports: [
+          { name: "Java_com_example_notes_auth_LoginActivity_authenticate", module: "JNI" },
+          { name: "Java_com_example_notes_auth_TokenStore_read", module: "JNI" },
+          { name: "JNI_OnLoad", module: "JNI" },
+        ],
+        sections: [
+          [".interp", "0x00000000", "28 B"],
+          [".dynsym", "0x00000270", "1.4 KB"],
+          [".text", "0x00001ab0", "184 KB"],
+          [".rodata", "0x0002e000", "12 KB"],
+          [".data.rel.ro", "0x00031000", "3.1 KB"],
+        ],
+        facts: [
+          ["FORMAT", "ELF 64-bit · ET_DYN"],
+          ["ARCHITECTURE", "AArch64"],
+          ["SIZE", "2.1 MB"],
+          ["SHA-256", "9c41a0f2be77d1e0c5…"],
+          ["WORKER MEMORY", "48 MB"],
+        ],
+      },
+    };
+
+    const DEX_TREE = [
+      { label: "com.example.notes.auth", kind: "package", open: true, children: [
+        { label: "LoginActivity", kind: "class", open: true, children: [
+          { label: "onCreate", kind: "method", detail: "218 B", method: "LoginActivity.onCreate" },
+          { label: "authenticate", kind: "method", detail: "412 B", method: "LoginActivity.authenticate" },
+          { label: "onActivityResult", kind: "method", detail: "96 B", method: "LoginActivity.onActivityResult" },
+          { label: "refreshToken", kind: "method", detail: "184 B", method: "LoginActivity.refreshToken" },
+        ]},
+        { label: "TokenStore", kind: "class", detail: "9 methods" },
+        { label: "SessionManager", kind: "class", detail: "22 methods" },
+      ]},
+      { label: "com.example.notes.data", kind: "package", detail: "6 classes" },
+      { label: "com.example.notes.net", kind: "package", detail: "4 classes" },
+    ];
+
+    const NATIVE_LIST = ["authenticate_user", "auth_parse_token", "clock_monotonic", "audit_write", "session_open"];
+
+    /* ======================================================== 高亮 */
+
+    const JAVA = new RegExp(
+      [
+        "(//[^\\n]*)",
+        "(\"(?:\\\\.|[^\"\\\\])*\")",
+        "(@[A-Za-z_]\\w*)",
+        "\\b(if|else|for|while|return|new|this|super|null|true|false|class|void|static|final|protected|public|private|long|int|boolean|struct|const|uint64_t|uint8_t)\\b",
+        "\\b(Result|Token|Claims|Credentials|String|System|Jwt|Audit|DeviceBinding|Bundle|Response|Session|Credentials|Timespec|Claims)\\b",
+        "\\b([A-Za-z_]\\w*)(?=\\s*\\()",
+        "\\b(0x[0-9a-fA-F]+|\\d+)\\b",
+      ].join("|"),
+      "g",
+    );
+    const TOKEN_CLASS = ["tok-com", "tok-str", "tok-ann", "tok-kw", "tok-ty", "tok-fn", "tok-num"];
+    const escapeHtml = (text) => text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+    function highlight(line) {
+      let out = "";
+      let cursor = 0;
+      JAVA.lastIndex = 0;
+      let match = JAVA.exec(line);
+      while (match !== null) {
+        if (match.index > cursor) out += escapeHtml(line.slice(cursor, match.index));
+        const group = match.slice(1).findIndex((value) => value !== undefined);
+        out += `<span class="${TOKEN_CLASS[group] ?? ""}">${escapeHtml(match[0])}</span>`;
+        cursor = match.index + match[0].length;
+        match = JAVA.exec(line);
+        if (match && match[0].length === 0) JAVA.lastIndex += 1;
+      }
+      return out + escapeHtml(line.slice(cursor));
+    }
+
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+
+    /* ==================================================== 标签的身份 */
+
+    /*
+     * 粒度跟着语言走，所以 key 的前缀说明「这是哪种单位」：
+     *   class:LoginActivity        一个 Java 类，正文里包含它的所有方法
+     *   function:audit_write       一个 native 函数
+     *   strings / meta:FORMAT      单例文档
+     */
+    const tabFor = {
+      javaClass: (id, method) => ({ key: `class:${id}`, label: id, kind: "javaClass", id, method: method ?? null, tag: "java" }),
+      nativeFunction: (name) => ({ key: `function:${name}`, label: name, kind: "nativeFunction", id: name, tag: "native" }),
+      // 下面这些描述的是「某个分析单元的什么东西」，所以单元进 key，
+      // 标签上也标出来 —— 否则 dex 和 .so 的两个 IMPORT 标签长得一模一样。
+      strings: (unit) => ({ key: `strings:${unit}`, label: "STRINGS", kind: "strings", unit, tag: UNITS[unit].short }),
+      imports: (unit) => ({ key: `import:${unit}`, label: "IMPORT", kind: "imports", unit, tag: UNITS[unit].short }),
+      exports: (unit) => ({ key: `export:${unit}`, label: "EXPORT", kind: "exports", unit, tag: UNITS[unit].short }),
+      meta: (unit) => ({ key: `meta:${unit}`, label: "META", kind: "meta", unit, tag: UNITS[unit].short }),
+    };
+
+    /* ============================================================ 视图 */
+
+    function buildBar(state, render) {
+      const bar = el("header", "bar");
+      bar.append(el("span", "mark", "Repi"), el("span", "file", "notes-release.apk"), el("span", "meta", "18.4 MB · minSdk 26 · targetSdk 35"), el("span", "spacer"));
+
+      const local = el("span", "local");
+      local.append(el("i"), document.createTextNode("LOCAL"));
+      bar.append(local);
+
+      const more = el("button", "more", "⋯");
+      more.type = "button";
+      more.setAttribute("aria-label", "More");
+      more.addEventListener("click", () => { state.menuOpen = !state.menuOpen; render(); });
+      bar.append(more);
+      return bar;
+    }
+
+    function buildMenu(state, render) {
+      const menu = el("div", "menu");
+      const toggle = el("button");
+      toggle.type = "button";
+      toggle.append(el("span", null, state.asm ? "显示反编译 C" : "显示汇编"));
+      toggle.append(el("kbd", null, "⌘⇧C"));
+      toggle.addEventListener("click", () => { state.asm = !state.asm; state.menuOpen = false; render(); });
+      menu.append(toggle);
+      return menu;
+    }
+
+    function buildSource(state, render) {
+      const row = el("div", "source");
+      const active = UNITS[state.unitId];
+
+      const current = el("button", "source-current");
+      current.type = "button";
+      current.dataset.testid = "source-current";
+      current.setAttribute("aria-expanded", String(state.pickerOpen));
+      current.append(el("span", null, active.label), el("span", "detail", active.detail), el("span", "caret", "▾"));
+      current.addEventListener("click", () => { state.pickerOpen = !state.pickerOpen; render(); });
+      row.append(current);
+
+      if (state.pickerOpen) {
+        const picker = el("div", "source-picker");
+        picker.dataset.testid = "source-picker";
+        picker.append(el("p", "group", "DEX"));
+        const dex = UNITS.dex;
+        const dexButton = el("button");
+        dexButton.type = "button";
+        dexButton.dataset.unit = dex.id;
+        dexButton.setAttribute("aria-selected", String(state.unitId === dex.id));
+        dexButton.append(el("span", null, dex.label), el("span", "detail", dex.detail));
+        dexButton.addEventListener("click", () => switchUnit(state, dex.id, render));
+        picker.append(dexButton);
+
+        picker.append(el("p", "group", "NATIVE"));
+        const native = UNITS.libnotes;
+        const nativeButton = el("button");
+        nativeButton.type = "button";
+        nativeButton.dataset.unit = native.id;
+        nativeButton.setAttribute("aria-selected", String(state.unitId === native.id));
+        nativeButton.append(el("span", null, native.label), el("span", "detail", native.detail));
+        nativeButton.addEventListener("click", () => switchUnit(state, native.id, render));
+        picker.append(nativeButton);
+
+        row.append(picker);
+      }
+
+      return row;
+    }
+
+    function switchUnit(state, unitId, render) {
+      state.unitId = unitId;
+      state.pickerOpen = false;
+      state.highlightMethod = null;
+      render();
+    }
+
+    function buildNavigator(state, render) {
+      const nav = el("div", "sections");
+      const unit = UNITS[state.unitId];
+      const isDex = unit.kind === "dex";
+
+      /*
+       * 只有这棵树要展开，因为它是树。
+       * STRINGS 和 META 是直接条目：几千条字符串在 268px 里只能给缩水预览，
+       * 多一次点击换更少信息。IMPORT / EXPORT 相反，它们是几十条的短表，
+       * 展开就能看全，所以既展开也开标签。
+       */
+      const tree = el("div", "section");
+      const treeOpen = state.sectionOpen.has("functions");
+      tree.dataset.open = String(treeOpen);
+
+      const treeHead = el("button", "section-head");
+      treeHead.type = "button";
+      treeHead.dataset.section = "functions";
+      treeHead.setAttribute("aria-expanded", String(treeOpen));
+      treeHead.append(
+        el("span", "twist", treeOpen ? "▾" : "▸"),
+        el("span", null, unit.navTitle),
+        el("span", "count", unit.navCount),
+      );
+      treeHead.addEventListener("click", () => {
+        if (state.sectionOpen.has("functions")) state.sectionOpen.delete("functions");
+        else state.sectionOpen.add("functions");
+        state.treeOpen = !treeOpen;
+        render();
+      });
+      tree.append(treeHead);
+
+      const treeBody = el("div", "section-body");
+      if (isDex) {
+        appendDexTree(treeBody, DEX_TREE, 0, state, render);
+      } else {
+        for (const name of NATIVE_LIST) {
+          const row = el("button", "row");
+          row.type = "button";
+          row.dataset.kind = "function";
+          row.dataset.key = name;
+          row.setAttribute("aria-selected", String(state.activeKey === `function:${name}`));
+          const meta = NATIVE_FUNCTIONS[name]?.meta ?? "";
+          row.append(el("span", "twist"), el("span", "label", name), el("span", "detail", meta.split(" · ")[1] ?? ""));
+          row.addEventListener("click", () => openTab(state, tabFor.nativeFunction(name), render));
+          treeBody.append(row);
+        }
+      }
+      tree.append(treeBody);
+      nav.append(tree);
+
+      // 单例条目：点了开标签
+      for (const entry of [
+        { id: "strings", title: "STRINGS", count: `${unit.strings.length} shown · 2,048 total` },
+        { id: "meta", title: "META", count: "format · sections" },
+      ]) {
+        const head = el("button", "section-head is-entry");
+        head.type = "button";
+        head.dataset.entry = entry.id;
+        head.append(el("span", "twist"), el("span", null, entry.title), el("span", "count", entry.count));
+        head.addEventListener("click", () => {
+          openTab(state, entry.id === "strings" ? tabFor.strings(state.unitId) : tabFor.meta(state.unitId), render);
+        });
+        nav.append(head);
+      }
+
+      // 可展开也能开标签的短表
+      for (const entry of [
+        { id: "import", title: "IMPORT", rows: unit.imports, tab: tabFor.imports(state.unitId) },
+        { id: "export", title: "EXPORT", rows: unit.exports, tab: tabFor.exports(state.unitId) },
+      ]) {
+        const section = el("div", "section");
+        const isOpen = state.sectionOpen.has(entry.id);
+        section.dataset.open = String(isOpen);
+
+        const head = el("button", "section-head");
+        head.type = "button";
+        head.dataset.section = entry.id;
+        head.setAttribute("aria-expanded", String(isOpen));
+        head.append(
+          el("span", "twist", isOpen ? "▾" : "▸"),
+          el("span", null, entry.title),
+          el("span", "count", `${entry.rows.length} entries`),
+        );
+        head.addEventListener("click", () => {
+          if (state.sectionOpen.has(entry.id)) state.sectionOpen.delete(entry.id);
+          else state.sectionOpen.add(entry.id);
+          // 展开的同时把它开成标签：一次点击，不是两次。
+          openTab(state, entry.tab, render);
+          return;
+        });
+        section.append(head);
+
+        const body = el("div", "section-body");
+        body.dataset.list = entry.id;
+        for (const row of entry.rows) {
+          const item = el("button", "row");
+          item.type = "button";
+          item.dataset.kind = entry.id;
+          item.append(el("span", "twist"), el("span", "label", row.name), el("span", "detail", row.module));
+          item.addEventListener("click", () => openTab(state, entry.tab, render));
+          body.append(item);
+        }
+        section.append(body);
+        nav.append(section);
+      }
+
+      return nav;
+    }
+
+    const classOf = (methodId) => (methodId.includes(".") ? methodId.slice(0, methodId.indexOf(".")) : methodId);
+
+    function appendDexTree(container, nodes, depth, state, render) {
+      for (const node of nodes) {
+        const open = node.children ? !state.closed.has(node.label) : false;
+        const row = el("button", "row");
+        row.type = "button";
+        row.dataset.kind = node.kind;
+        row.dataset.key = node.label;
+        const selected =
+          (node.kind === "class" && state.activeKey === `class:${node.label}` && !state.highlightMethod) ||
+          (node.kind === "method" && state.highlightMethod === node.method);
+        row.setAttribute("aria-selected", String(selected));
+        row.style.paddingLeft = `${8 + depth * 12}px`;
+        row.append(el("span", "twist", node.children ? (open ? "▾" : "▸") : ""), el("span", "label", node.label));
+        if (node.detail) row.append(el("span", "detail", node.detail));
+        row.addEventListener("click", () => {
+          if (node.children && node.kind === "package") {
+            if (state.closed.has(node.label)) state.closed.delete(node.label);
+            else state.closed.add(node.label);
+            render();
+            return;
+          }
+          if (node.kind === "class") {
+            openTab(state, tabFor.javaClass(node.label), render);
+            return;
+          }
+          // 方法 → 打开它所属的类，并标出这个方法
+          openTab(state, tabFor.javaClass(classOf(node.method), node.method), render);
+        });
+        container.append(row);
+        if (node.children && open) appendDexTree(container, node.children, depth + 1, state, render);
+      }
+    }
+
+    function buildTabs(state, render) {
+      const tabs = el("nav", "tabs");
+      tabs.dataset.testid = "tabs";
+      for (const tab of state.tabs) {
+        const item = el("div", "tab");
+        item.dataset.tab = tab.key;
+        item.dataset.label = tab.label;
+        item.setAttribute("aria-selected", String(state.activeKey === tab.key));
+
+        const pick = el("button", "pick");
+        pick.type = "button";
+        pick.title = tab.kind === "javaClass" ? JAVA_CLASSES[tab.id].fqn : tab.label;
+        pick.append(el("span", "name", tab.label));
+        if (tab.tag) pick.append(el("span", "lang", tab.tag));
+        pick.addEventListener("click", () => { state.activeKey = tab.key; render(); });
+
+        const close = el("button", "close", "×");
+        close.type = "button";
+        close.dataset.close = tab.key;
+        close.setAttribute("aria-label", `关闭 ${tab.label}`);
+        close.addEventListener("click", () => closeTab(state, tab.key, render));
+
+        item.append(pick, close);
+        tabs.append(item);
+      }
+
+      requestAnimationFrame(() => {
+        tabs.querySelector('.tab[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
+
+      return tabs;
+    }
+
+    function buildSubject(state, render) {
+      const tab = state.tabs.find((entry) => entry.key === state.activeKey);
+      const wrap = el("div", "subject");
+
+      if (!tab) {
+        const empty = el("div", "empty");
+        empty.dataset.testid = "no-tab";
+        empty.append(el("p", "empty-label", "NO TAB OPEN"));
+        empty.append(el("p", "empty-hint", "在左栏选一个类或函数，或者打开 STRINGS / META 的某一组。"));
+        wrap.append(empty);
+        return wrap;
+      }
+
+      const head = el("div", "head");
+      const meta = el("span", "meta");
+      const mode = el("span", "mode", state.asm ? "ASM" : "");
+      mode.dataset.testid = "mode-label";
+
+      if (tab.kind === "javaClass") {
+        const klass = JAVA_CLASSES[tab.id];
+        head.append(el("b", null, klass.fqn), meta, el("span", "spacer"), mode);
+        meta.textContent = klass.meta;
+
+        const code = el("div", "code");
+        code.dataset.testid = "code-body";
+
+        if (klass.methods.length === 0) {
+          code.append(el("div", "line", "    // 这个类的正文在这个 mock 里没有展开"));
+        }
+
+        let lineNumber = 1;
+        for (const methodId of klass.methods) {
+          const body = JAVA_METHODS[methodId];
+          if (!body) continue;
+          const name = methodId.slice(methodId.indexOf(".") + 1);
+
+          const member = el("div", "member");
+          member.dataset.method = name;
+          if (tab.method === methodId) member.dataset.hit = "true";
+          member.append(el("span", null, `▸ ${name}`), el("span", "meta", body.meta));
+          code.append(member);
+
+          const block = el("div", "body-block");
+          if (tab.method === methodId) block.dataset.hit = "true";
+          for (const text of body.lines) {
+            const line = el("div", "line");
+            line.append(el("span", "ln", String(lineNumber)));
+            const span = el("span");
+            span.innerHTML = highlight(text);
+            line.append(span);
+            block.append(line);
+            lineNumber += 1;
+          }
+          code.append(block);
+        }
+
+        const doc = el("div", "doc");
+        doc.append(head, code);
+        wrap.append(doc);
+        return wrap;
+      }
+
+      if (tab.kind === "nativeFunction") {
+        const body = NATIVE_FUNCTIONS[tab.id] ?? { meta: "function · 96 bytes", lines: [`void *${tab.id}(void *arg) {`, "    return NULL;", "}"] };
+        head.append(el("b", null, tab.id), meta, el("span", "spacer"), mode);
+        meta.textContent = body.meta;
+
+        const code = el("div", "code");
+        code.dataset.testid = "code-body";
+        body.lines.forEach((text, index) => {
+          const line = el("div", "line");
+          line.append(el("span", "ln", String(index + 1)));
+          const span = el("span");
+          span.innerHTML = highlight(text);
+          line.append(span);
+          code.append(line);
+        });
+
+        const doc = el("div", "doc");
+        doc.append(head, code);
+        wrap.append(doc);
+        return wrap;
+      }
+
+      if (tab.kind === "strings") {
+        const unit = UNITS[tab.unit];
+        const panel = el("div", "panel");
+        panel.dataset.testid = "strings-panel";
+        panel.append(el("h4", null, `STRINGS · ${unit.label}`));
+        const table = el("table");
+        const headRow = el("tr");
+        for (const label of ["ADDRESS", "VALUE", "XREFS", "USED BY"]) headRow.append(el("th", null, label));
+        table.append(headRow);
+        for (const entry of unit.strings) {
+          // 跳到用到它的那个单位，落点跟着当前语言
+          const target = unit.kind === "dex"
+            ? tabFor.javaClass(classOf(entry.owner), entry.owner)
+            : tabFor.nativeFunction(entry.owner);
+
+          const row = el("tr");
+          row.dataset.kind = "string";
+          row.dataset.entry = entry.value;
+          row.title = `打开 ${target.label}`;
+          row.append(el("td", null, entry.address), el("td", null, `"${entry.value}"`), el("td", "num", String(entry.xrefs)), el("td", "num", entry.owner));
+          row.addEventListener("click", () => openTab(state, target, render));
+          table.append(row);
+        }
+        panel.append(table);
+        wrap.append(panel);
+        return wrap;
+      }
+
+      if (tab.kind === "imports" || tab.kind === "exports") {
+        const unit = UNITS[tab.unit];
+        const isImport = tab.kind === "imports";
+        const rows = isImport ? unit.imports : unit.exports;
+
+        const panel = el("div", "panel");
+        panel.dataset.testid = isImport ? "imports-panel" : "exports-panel";
+        panel.append(el("h4", null, `${isImport ? "IMPORT" : "EXPORT"} · ${unit.label} · ${rows.length} entries`));
+        const table = el("table");
+        const headRow = el("tr");
+        for (const label of ["NAME", isImport ? "MODULE" : "KIND"]) headRow.append(el("th", null, label));
+        table.append(headRow);
+        for (const row of rows) {
+          const tr = el("tr");
+          tr.append(el("td", null, row.name), el("td", "num", row.module));
+          table.append(tr);
+        }
+        panel.append(table);
+        wrap.append(panel);
+        return wrap;
+      }
+
+      // META：一页滚动，现在只剩两段 —— 导入导出各自成标签了
+      const unit = UNITS[tab.unit];
+      const panel = el("div", "panel");
+      panel.dataset.testid = "meta-panel";
+
+      panel.append(el("h4", null, "FORMAT"));
+      const facts = el("dl", "kv");
+      for (const [key, value] of unit.facts) facts.append(el("dt", null, key), el("dd", null, value));
+      panel.append(facts);
+
+      panel.append(el("h4", null, "SECTIONS"));
+      const sections = el("table");
+      const sectionHead = el("tr");
+      for (const label of ["NAME", "ADDRESS", "SIZE"]) sectionHead.append(el("th", null, label));
+      sections.append(sectionHead);
+      for (const [name, address, size] of unit.sections) {
+        const row = el("tr");
+        row.append(el("td", null, name), el("td", null, address), el("td", "num", size));
+        sections.append(row);
+      }
+      panel.append(sections);
+
+      wrap.append(panel);
+      return wrap;
+    }
+
+    /* ========================================================== 状态机 */
+
+    function openTab(state, tab, render) {
+      const existing = state.tabs.find((entry) => entry.key === tab.key);
+      if (existing) {
+        // 已经开着就只切过去。同一种单位再点一次，命中的位置跟着换。
+        if (tab.kind === "javaClass") existing.method = tab.method;
+        state.activeKey = tab.key;
+      } else {
+        state.tabs.push(tab);
+        state.activeKey = tab.key;
+      }
+      state.highlightMethod = tab.kind === "javaClass" ? tab.method : null;
+      render();
+    }
+
+    function closeTab(state, key, render) {
+      const index = state.tabs.findIndex((entry) => entry.key === key);
+      if (index === -1) return;
+      state.tabs.splice(index, 1);
+      if (state.activeKey === key) {
+        const next = state.tabs[index] ?? state.tabs[index - 1] ?? null;
+        state.activeKey = next ? next.key : null;
+        state.highlightMethod = next && next.kind === "javaClass" ? next.method : null;
+      }
+      render();
+    }
+
+    function buildApp() {
+      const state = {
+        tabs: [],
+        activeKey: null,
+        unitId: "dex",
+        sectionOpen: new Set(["functions"]),
+        treeOpen: true,
+        closed: new Set(),
+        highlightMethod: null,
+        pickerOpen: false,
+        asm: false,
+        menuOpen: false,
+      };
+      let root = null;
+
+      state.tabs.push(tabFor.javaClass("LoginActivity", "LoginActivity.authenticate"));
+      state.activeKey = "class:LoginActivity";
+      state.highlightMethod = "LoginActivity.authenticate";
+
+      const render = () => {
+        const fresh = el("div", "app");
+        state.active = state.tabs.find((entry) => entry.key === state.activeKey) ?? null;
+        fresh.append(buildBar(state, render), buildSource(state, render));
+        if (state.menuOpen) fresh.append(buildMenu(state, render));
+        fresh.append(buildNavigator(state, render));
+        const main = el("main", "main");
+        main.dataset.tabs = String(state.tabs.length > 0);
+        main.append(buildTabs(state, render), buildSubject(state, render));
+        fresh.append(main);
+        if (root) root.replaceWith(fresh);
+        root = fresh;
+      };
+
+      render();
+      return {
+        element: root,
+        render,
+        openClass: (id, method) => openTab(state, tabFor.javaClass(id, method), render),
+        openFunction: (name) => openTab(state, tabFor.nativeFunction(name), render),
+        openStrings: () => openTab(state, tabFor.strings(state.unitId), render),
+        openMeta: () => openTab(state, tabFor.meta(state.unitId), render),
+        openImports: () => openTab(state, tabFor.imports(state.unitId), render),
+        openExports: () => openTab(state, tabFor.exports(state.unitId), render),
+        switchUnit: (unitId) => switchUnit(state, unitId, render),
+        closeAll: () => {
+          state.tabs = [];
+          state.activeKey = null;
+          state.highlightMethod = null;
+          render();
+        },
+      };
+    }
+
+    /* ========================================================== 外壳 */
+
+    const frame = document.getElementById("frame");
+    const built = buildApp();
+    frame.append(built.element);
+
+    function fit() {
+      const wrap = document.querySelector(".frame-wrap");
+      const available = Math.min(wrap.clientWidth || document.body.clientWidth - 64, 1180);
+      const scale = Math.max(0.3, Math.min(1, available / 1180));
+      frame.style.transform = `scale(${scale})`;
+      wrap.style.height = `${820 * scale}px`;
+    }
+    window.addEventListener("resize", fit);
+    requestAnimationFrame(fit);
+
+    document.querySelectorAll(".tools button").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.action === "open-many") {
+          built.openClass("TokenStore");
+          built.openClass("SessionManager");
+          built.switchUnit("libnotes");
+          built.openFunction("audit_write");
+          built.openFunction("session_open");
+          built.openStrings();
+          built.openImports();
+          built.openExports();
+        } else {
+          built.closeAll();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

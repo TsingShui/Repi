@@ -1,0 +1,259 @@
+.top-bar-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.top-bar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.top-bar-link:hover {
+  color: var(--accent);
+}
+
+.top-bar-link-arrow {
+  font-size: 9px;
+}
+
+.home {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.home-hero {
+  display: flex;
+  /* Fills the page: the hero is the whole home screen now that the footer is
+     gone, and it grows so a long notice never collides with the edge. */
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(30px, 5vw, 72px) clamp(18px, 5vw, 64px);
+  padding-bottom: calc(clamp(30px, 5vw, 72px) + env(safe-area-inset-bottom));
+  padding-left: calc(clamp(18px, 5vw, 64px) + env(safe-area-inset-left));
+  padding-right: calc(clamp(18px, 5vw, 64px) + env(safe-area-inset-right));
+}
+
+.brand-mark svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.eyebrow {
+  margin-bottom: 18px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+}
+
+.hero-title {
+  max-width: 15ch;
+  font-size: clamp(46px, 7vw, 92px);
+  font-weight: 530;
+  letter-spacing: -0.055em;
+  line-height: 0.96;
+}
+
+.hero-copy {
+  max-width: 620px;
+  margin: 22px 0 34px;
+  color: var(--ink-muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/*
+ * Two ways in, joined into one object: no gap, one outline, an internal seam.
+ * They are complements — the same outcome through two different gestures — so
+ * they are drawn as two halves of a single control rather than two controls
+ * that happen to sit next to each other.
+ */
+.hero-actions {
+  display: flex;
+  width: fit-content;
+  align-self: flex-start;
+  max-width: 100%;
+  border: 1px solid var(--accent);
+}
+
+.entry-block {
+  position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.entry-block-label {
+  white-space: nowrap;
+}
+
+.entry-block.is-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.entry-block.is-primary:hover {
+  filter: brightness(1.06);
+}
+
+.entry-block.is-primary:active {
+  filter: brightness(0.96);
+}
+
+/* The seam is the only line between them, and it belongs to the accent. */
+.entry-block.is-secondary {
+  border-left: 1px solid var(--accent);
+  background: rgba(77, 107, 254, 0.1);
+  color: var(--accent);
+}
+
+.entry-block.is-secondary:hover {
+  background: rgba(77, 107, 254, 0.18);
+}
+
+/* The block is the drop target, so it answers a file being carried over it. */
+.entry-block.is-secondary[data-drop-active="true"] {
+  background: rgba(77, 107, 254, 0.26);
+}
+
+.entry-block:focus-within,
+.entry-block:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The native control stays in the layout so assistive tech still reaches it. */
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+}
+
+/*
+ * The install line for the Pi package, which is the other half of Repi. It sits
+ * under a hairline so it stays secondary to opening a file, but at reading size:
+ * it was 10px mono and read as a footnote nobody would follow.
+ */
+.quick-start {
+  max-width: 660px;
+  margin-top: 36px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.quick-start-lead {
+  margin-bottom: 14px;
+  color: var(--ink);
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.quick-start-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.quick-start-label {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.quick-start-command {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow-x: auto;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: var(--canvas-sunken);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.quick-start-copy {
+  min-height: 44px;
+  flex: none;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--canvas);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* A pointer that is not a finger can take the tighter target. */
+.app[data-pointer="fine"] .quick-start-command,
+.app[data-pointer="fine"] .quick-start-copy {
+  min-height: 40px;
+}
+
+.quick-start-copy:hover {
+  border-color: var(--ink-faint);
+}
+
+.quick-start-copy[data-copy-state="copied"] {
+  border-color: var(--local);
+  color: var(--local);
+}
+
+.quick-start-copy[data-copy-state="selected"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* A refusal, not a readout: one line, and no table under it. */
+.home-notice {
+  max-width: 620px;
+  margin-top: 22px;
+  border-left: 2px solid var(--danger);
+  padding-left: 12px;
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.format-list {
+  display: block;
+  margin-top: 16px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

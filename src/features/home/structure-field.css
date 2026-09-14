@@ -1,0 +1,53 @@
+/*
+ * The structure field is the page's material, not a panel: it fills the whole
+ * viewport behind the interface. A left-weighted veil keeps the headline and
+ * body copy legible while the field stays vivid on the right.
+ */
+
+.structure-field {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.structure-field-canvas {
+  display: block;
+}
+
+/*
+ * Readability veil.
+ *
+ * Landscape puts the content column on the left, so a horizontal ramp protects
+ * it. Portrait centres the content vertically, so the veil becomes a radial
+ * pool over that block, which leaves the empty top and bottom of the field
+ * fully visible instead of hiding it.
+ */
+.structure-field::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgb(var(--canvas-rgb) / 93%) 0%,
+    rgb(var(--canvas-rgb) / 87%) 26%,
+    rgb(var(--canvas-rgb) / 52%) 50%,
+    rgb(var(--canvas-rgb) / 16%) 71%,
+    rgb(var(--canvas-rgb) / 0%) 90%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+@media (max-width: 899px) {
+  .structure-field::after {
+    background: radial-gradient(
+      120% 58% at 6% 50%,
+      rgb(var(--canvas-rgb) / 93%) 0%,
+      rgb(var(--canvas-rgb) / 89%) 40%,
+      rgb(var(--canvas-rgb) / 60%) 66%,
+      rgb(var(--canvas-rgb) / 26%) 86%,
+      rgb(var(--canvas-rgb) / 8%) 100%
+    );
+  }
+}

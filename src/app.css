@@ -1,0 +1,138 @@
+/*
+ * Application shell. One full-height column: a top bar that belongs to the
+ * active screen, then the screen content. The structure field is an absolutely
+ * positioned layer behind both, so it never scrolls with the content.
+ */
+
+.app {
+  position: relative;
+  display: grid;
+  /* Without this the column is sized to its content, and the tab strip's
+     min-content — the sum of every open tab — pushes the whole app wider than
+     the viewport. `minmax(0, 1fr)` lets the strip scroll instead. */
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+  grid-template-rows: auto 1fr;
+  background: var(--canvas);
+}
+
+/* ========================================================== drop target */
+
+/*
+ * The screen is the drop target, so the whole screen says so: a wash that comes
+ * in from each edge and fades before it reaches the middle, which keeps the text
+ * in the centre readable while the file is being carried over it.
+ *
+ * Four gradient strips rather than one inset shadow, because a shadow's falloff
+ * has to be guessed while a strip can be told exactly how far in to reach. The
+ * corners darken where two strips overlap, which is what makes the light read as
+ * coming from outside the frame.
+ */
+.drop-glow {
+  --drop-reach: 15%;
+  --drop-tint: rgba(77, 107, 254, 0.22);
+
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  background-repeat: no-repeat;
+  background-image:
+    linear-gradient(to bottom, var(--drop-tint), transparent),
+    linear-gradient(to top, var(--drop-tint), transparent),
+    linear-gradient(to right, var(--drop-tint), transparent),
+    linear-gradient(to left, var(--drop-tint), transparent);
+  background-size:
+    100% var(--drop-reach),
+    100% var(--drop-reach),
+    var(--drop-reach) 100%,
+    var(--drop-reach) 100%;
+  background-position: top, bottom, left, right;
+}
+
+.drop-glow[data-active="true"] {
+  opacity: 1;
+  animation: drop-breathe 2200ms ease-in-out infinite;
+}
+
+/* Slower than the eye tracks, so it reads as the screen waiting rather than blinking. */
+@keyframes drop-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-glow[data-active="true"] {
+    animation: none;
+  }
+}
+
+/* ========================================================== application bar */
+
+/*
+ * Shared by the home screen and the licences page. It is the application's bar,
+ * not either page's, which is why it lives with the shell rather than with one
+ * of its users.
+ */
+.top-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 60px;
+  padding: 0 clamp(18px, 3vw, 32px);
+  padding-top: env(safe-area-inset-top);
+}
+
+.top-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}
+
+.top-bar-back {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.top-bar-sep {
+  color: var(--line-strong);
+}
+
+.top-bar-title {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+}

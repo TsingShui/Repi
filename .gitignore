@@ -1,0 +1,11 @@
+node_modules/
+*.tsbuildinfo
+# Anchored: a bare `dist/` also matches src/vendor/kuna/vendor/browser_wasi_shim/dist/,
+# which is tracked vendored source. That mistake cost eight files once.
+/dist/
+.smoke/
+public/kuna/
+.pi/
+.DS_Store
+docs/.direction-demos/
+docs/.workspace-demo/

@@ -1,0 +1,1361 @@
+/*
+ * The C′ skin, scoped to the workspace.
+ *
+ * The home screen keeps its landing-page treatment, so none of this touches
+ * `:root`. Palette and density are both here because both are decisions about
+ * this surface.
+ *
+ * Density defaults to the touch floor and is tightened only when a precise
+ * pointer is present. The order matters: if the check never matches on a device —
+ * which has not been verified on an iPad with a trackpad attached — the result is
+ * a less dense workspace, never an unreachable control.
+ */
+.app[data-surface="workspace"] {
+  --top-bar-h: 44px;
+  --head-h: 44px;
+  --row-h: 44px;
+  --tab-h: 44px;
+
+  --canvas: #ffffff;
+  --canvas-sunken: #f4f4f4;
+  --canvas-raised: #e9e9e9;
+  --bar: #e8e8e8;
+  --line: #c4c7cb;
+  --line-strong: #a9adb2;
+
+  --ink: #23262a;
+  --ink-muted: #5a5f66;
+  --ink-faint: #8d9298;
+
+  --accent: #6b86b8;
+  --accent-soft: #ccd6e8;
+  --accent-ink: #1a2433;
+
+  --local: #2f7a5c;
+  --working: #8a6d1f;
+  --danger: #b3261e;
+
+  --code-fs: 12px;
+  --code-lh: 17px;
+}
+
+/*
+ * Keyed off an attribute rather than a media query in CSS, because the same
+ * decision drives the virtualised lists' offsets and because a coarse pointer
+ * cannot be emulated in a test. One source, two consumers.
+ */
+.app[data-surface="workspace"][data-pointer="fine"] {
+  --top-bar-h: 36px;
+  --head-h: 30px;
+  --row-h: 28px;
+  --tab-h: 32px;
+}
+
+/* ============================================================ top bar */
+
+.workspace-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--top-bar-h);
+  padding: 0 8px;
+  padding-top: env(safe-area-inset-top);
+  border-bottom: 1px solid var(--line);
+  background: var(--bar);
+}
+
+.workspace-top-spacer {
+  flex: 1;
+}
+
+.workspace-back,
+.workspace-pane-toggle {
+  display: inline-flex;
+  min-height: var(--top-bar-h);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.workspace-back {
+  width: var(--top-bar-h);
+}
+
+.workspace-back .brand-mark svg {
+  width: 17px;
+  height: 17px;
+}
+
+.workspace-brand {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+
+.workspace-sep {
+  color: var(--line-strong);
+}
+
+/* Truncated, never wrapped: a long file name must not reshape the bar. */
+.workspace-file {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-back:hover,
+.workspace-pane-toggle:hover {
+  color: var(--ink);
+}
+
+.workspace-pane-toggle {
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.workspace-local {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--local);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.workspace-local-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--local);
+}
+
+.workspace-menu-anchor {
+  position: relative;
+}
+
+.workspace-more {
+  display: grid;
+  width: var(--top-bar-h);
+  height: var(--top-bar-h);
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.workspace-more:hover {
+  color: var(--ink);
+}
+
+.workspace-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% - 4px);
+  right: 0;
+  min-width: 220px;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  box-shadow: var(--panel-lift);
+}
+
+.workspace-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.workspace-menu button:hover {
+  background: var(--canvas-raised);
+}
+
+.workspace-menu kbd {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* ============================================================== body */
+
+/* Positioning context for the narrow-mode overlay and its scrim. */
+.workspace-body {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-template-columns: var(--navigator-width, 300px) minmax(0, 1fr);
+  /* A notched device reserves space at the sides and along the bottom edge. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Below the width where both panes stop being useful, the navigator overlays. */
+.workspace-body[data-narrow="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-navigator {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--canvas-sunken);
+}
+
+.workspace-body[data-narrow="true"] .workspace-navigator {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  left: env(safe-area-inset-left);
+  width: var(--navigator-width, 300px);
+  border-right: 1px solid var(--line-strong);
+  box-shadow: var(--panel-lift);
+}
+
+.workspace-body[data-narrow="true"][data-navigator="closed"] .workspace-navigator {
+  display: none;
+}
+
+/* Scrim: the only thing that closes the overlay, and it is a large target. */
+.workspace-scrim {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: var(--scrim);
+  cursor: pointer;
+}
+
+/*
+ * ========================================================== navigator
+ *
+ * Only the tree needs room to breathe. Imports and exports are short lists, so
+ * they size to their content and are capped rather than taking the column over.
+ */
+.workspace-navigator > .section[data-section="tree"] {
+  min-height: 0;
+  flex: 1;
+}
+
+.section {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-head {
+  display: flex;
+  width: 100%;
+  min-height: var(--head-h);
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  background: var(--bar);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+
+.section-head:hover {
+  background: var(--canvas-raised);
+}
+
+.section-toggle {
+  display: flex;
+  min-height: var(--head-h);
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+}
+
+.twist {
+  width: 10px;
+  flex: none;
+  color: var(--ink-faint);
+}
+
+.section-title {
+  flex: 1;
+  text-transform: uppercase;
+}
+
+.section-count {
+  flex: none;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.section-working {
+  color: var(--working);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* A single document: click opens it, there is nothing to expand. */
+.section-head.is-entry {
+  cursor: pointer;
+}
+
+.section-head.is-entry .twist {
+  visibility: hidden;
+}
+
+.section-body {
+  min-height: 0;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.navigator-stop {
+  display: grid;
+  width: var(--head-h);
+  height: var(--head-h);
+  flex: none;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.navigator-stop:hover {
+  color: var(--ink);
+}
+
+.navigator-filter {
+  display: flex;
+  min-height: var(--head-h);
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+  color: var(--ink-faint);
+}
+
+.navigator-filter-icon {
+  font-size: 12px;
+}
+
+.navigator-filter input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+/* ====================================================== virtual list */
+
+.virtual-list {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  outline-offset: -2px;
+}
+
+.virtual-list-sizer {
+  position: relative;
+  width: 100%;
+}
+
+.virtual-list-window {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+.virtual-row {
+  overflow: hidden;
+}
+
+/* The virtual list already puts an explicit pixel height on the wrapper, so the
+   row fills it exactly and offsets cannot disagree with heights. */
+.virtual-row .navigator-row {
+  height: 100%;
+}
+
+.navigator-row {
+  display: flex;
+  width: 100%;
+  /* Sized by the row token, not by the container. `height: 100%` here resolves
+     against whatever is around the row — 328px inside the expanded IMPORT body,
+     which renders one symbol per screen. */
+  min-height: var(--row-h);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.navigator-row:hover {
+  background: var(--canvas-raised);
+}
+
+.navigator-row[aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.navigator-row[data-kind="package"] .navigator-row-label,
+.navigator-row[data-kind="class"] .navigator-row-label {
+  min-width: 0;
+
+  font-weight: 650;
+}
+
+.navigator-row[data-kind="method"] .navigator-row-label,
+.navigator-row[data-kind="function"] .navigator-row-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.navigator-row[data-depth="1"] {
+  padding-left: 20px;
+}
+
+.navigator-row[data-depth="2"] {
+  padding-left: 32px;
+}
+
+.navigator-row[data-expanded="true"] .navigator-row-label::before {
+  margin-right: 5px;
+  color: var(--ink-faint);
+  content: "▾";
+}
+
+.navigator-row[data-expanded="false"] .navigator-row-label::before {
+  margin-right: 5px;
+  color: var(--ink-faint);
+  content: "▸";
+}
+
+.navigator-row-label {
+  overflow: hidden;
+  flex: 1;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navigator-row-detail {
+  flex: none;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.navigator-row[aria-selected="true"] .navigator-row-detail {
+  color: var(--accent-ink);
+  opacity: 0.7;
+}
+
+.symbol-row {
+  border-left: 2px solid transparent;
+}
+
+/* ================================================== source switcher */
+
+/*
+ * The first row of the column. The unit of the list is an analysis unit, not a
+ * file: a DEX that holds several classes.dex is one entry, and each native
+ * library is its own because each is a separate executable.
+ */
+.source-switcher {
+  position: relative;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--bar);
+}
+
+.source-current {
+  display: grid;
+  width: 100%;
+  min-height: var(--head-h);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  gap: 0 8px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.source-current-label {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-current-detail {
+  grid-area: 2 / 1;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.source-chevron {
+  grid-area: 1 / 2 / span 2 / 2;
+  align-self: center;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
+
+.source-scrim {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.source-picker {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  right: 4px;
+  left: 4px;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--canvas);
+  box-shadow: var(--panel-lift);
+}
+
+.source-group {
+  margin: 0;
+  padding: 6px 10px 4px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.source-option {
+  display: flex;
+  width: 100%;
+  min-height: var(--row-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.source-option:hover {
+  background: var(--canvas-raised);
+}
+
+.source-option[aria-selected="true"] {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.source-option-label {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-option-detail {
+  flex: none;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* ============================================================== tabs */
+
+/* The strip and the mode toggle share a row: the mode belongs to the code tab. */
+.workspace-strip {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: var(--bar);
+}
+
+.view-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.view-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.view-tabs-empty {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--ink-faint);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.view-tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  /* Drawn inside the tab rather than as a border: a border adds its width to the
+     tab, which makes the strip 34px instead of the 32px it is specified as. */
+  box-shadow: inset 0 -2px 0 transparent;
+}
+
+.view-tab[data-active="true"] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.view-tab-label {
+  display: flex;
+  max-width: 200px;
+  min-height: var(--tab-h);
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.view-tab[data-active="true"] .view-tab-label {
+  color: var(--ink);
+}
+
+.view-tab-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-tab-tag {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.view-tab-close {
+  display: grid;
+  width: var(--tab-h);
+  height: var(--tab-h);
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.view-tab-close:hover {
+  color: var(--ink);
+}
+
+/* ============================================================ 主区域 */
+
+.workspace-view {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace-main {
+  position: relative;
+  display: grid;
+  /* The column is pinned, not automatic. An `auto` column is sized to its
+     widest content, so one very long function name inside a code line makes the
+     whole page wider than the window — the grid grows instead of the code
+     scrolling. Same reason `.app` pins its column. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--canvas);
+}
+
+/* ========================================================== code view */
+
+.view-code {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+
+
+
+
+
+
+
+
+/* 模式只是一个标签，不是控件。默认 C 时什么都不显示。 */
+.code-mode {
+  flex: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/*
+ * The label is also the control. It stays quiet in C, which is the mode almost
+ * every visit is in, and takes the accent once it is doing something — the
+ * segmented switch that was tried here first announced itself in both.
+ */
+.code-mode.is-control {
+  display: inline-flex;
+  min-height: var(--tab-h);
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.code-mode.is-control:hover {
+  background: var(--canvas-raised);
+  color: var(--ink);
+}
+
+.code-mode.is-control[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.code-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.code-scroll {
+  padding: 4px 0 40vh;
+}
+
+.code-member {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.code-member[data-hit="true"] {
+  border-top-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.code-member-name::before {
+  margin-right: 5px;
+  content: "▸";
+}
+
+.code-member-detail {
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+.code-member[data-hit="true"] .code-member-detail {
+  color: var(--accent-ink);
+  opacity: 0.7;
+}
+
+.code-block[data-hit="true"] {
+  background: #fbfaf3;
+}
+
+.code-member-gap {
+  height: 10px;
+}
+
+.code-line {
+  display: flex;
+  gap: 10px;
+  min-height: var(--code-lh);
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: var(--code-fs);
+  line-height: var(--code-lh);
+  white-space: pre;
+}
+
+.line-no {
+  width: 3ch;
+  flex: none;
+  color: var(--ink-faint);
+  text-align: right;
+  user-select: none;
+}
+
+.line-addr {
+  width: 10ch;
+  flex: none;
+  color: var(--ink-faint);
+  user-select: none;
+}
+
+.line-bytes {
+  width: 11ch;
+  flex: none;
+  color: var(--ink-faint);
+  user-select: none;
+}
+
+.code {
+  min-width: 0;
+}
+
+.tok-com { color: var(--ink-faint); font-style: italic; }
+.tok-kw { color: #7a1f8f; }
+.tok-ty { color: #1f5b8f; }
+.tok-fn { color: #8f4508; }
+.tok-str { color: #6b4e12; }
+.tok-num { color: #1f5f52; }
+.tok-register { color: #1f5b8f; }
+
+.code-pending {
+  display: grid;
+  height: 100%;
+  place-items: center;
+}
+
+.code-pending-label {
+  color: var(--working);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.code-failed {
+  padding: 20px 12px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* ==================================================== strings / symbols */
+
+.view-strings,
+.view-symbols {
+  grid-template-columns: minmax(0, 1fr);
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.view-symbols {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.view-table-head {
+  display: flex;
+  min-height: var(--head-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.view-table-title,
+.view-table-count {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.view-table-empty {
+  padding: 16px 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.strings-filter {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-faint);
+}
+
+.strings-filter input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.strings-columns,
+.strings-row {
+  display: grid;
+  grid-template-columns: 12ch minmax(0, 1fr) 6ch;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.strings-columns,
+.symbol-columns {
+  min-height: 24px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.strings-columns {
+  display: grid;
+  grid-template-columns: 12ch minmax(0, 1fr) 6ch;
+  align-items: center;
+  gap: 16px;
+}
+
+.strings-row {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.strings-row:hover {
+  background: var(--canvas-raised);
+}
+
+.strings-row[data-jumpable="false"] {
+  cursor: default;
+}
+
+.strings-col-addr {
+  color: var(--ink-faint);
+}
+
+.strings-col-value {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strings-col-xrefs {
+  color: var(--ink-muted);
+  text-align: right;
+}
+
+.strings-col-xrefs[data-empty="true"] {
+  color: var(--ink-faint);
+}
+
+.symbol-columns,
+.symbol-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12ch;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.symbol-rows {
+  min-height: 0;
+  overflow: auto;
+}
+
+.symbol-row {
+  min-height: var(--row-h);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.symbol-name {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-module {
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+/* ============================================================ meta */
+
+.view-meta {
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 15vh;
+}
+
+.meta-section {
+  padding: 12px 8px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.meta-heading {
+  margin-bottom: 10px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.meta-facts {
+  margin: 0;
+}
+
+.meta-fact {
+  display: grid;
+  grid-template-columns: 16ch minmax(0, 1fr);
+  align-items: baseline;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.meta-fact dt {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.meta-fact dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.meta-hash {
+  color: var(--ink-muted);
+}
+
+.meta-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.meta-table-head,
+.meta-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 12ch 10ch 6ch;
+  align-items: center;
+  gap: 16px;
+  padding: 3px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.meta-table-head {
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.meta-table-row:hover {
+  background: var(--canvas-raised);
+}
+
+.meta-cell-name {
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-cell-mono {
+  color: var(--ink-muted);
+  text-align: right;
+}
+
+.meta-empty,
+.meta-truncated {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.meta-truncated {
+  padding-top: 8px;
+}
+
+/* ======================================================= progress overlay */
+
+/*
+ * Absolutely positioned, so it costs the page no height. It sits directly under
+ * the top bar and above everything in the body.
+ */
+.progress-overlay {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+/* No honest fraction available, so the bar says "working" without claiming how much. */
+.progress-overlay[data-determinate="false"] .progress-fill {
+  width: 28%;
+  animation: progress-sweep 1.3s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(460%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-overlay[data-determinate="false"] .progress-fill {
+    width: 100%;
+    opacity: 0.45;
+    animation: none;
+  }
+}
+
+/* ============================================================ empty state */
+
+.workspace-empty {
+  position: relative;
+  display: grid;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.empty-field {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* The host has its own veil for the home screen; here the text sits on top. */
+.empty-field .structure-field::after {
+  display: none;
+}
+
+.workspace-empty-label {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workspace-empty-hint {
+  position: relative;
+  z-index: 1;
+  max-width: 38ch;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ============================================================ handle */
+
+/*
+ * Drag handle. Sits on the navigator's edge with a wide invisible hit area so a
+ * finger can find it. Resizing is an enhancement: the default width works on its
+ * own, which is what keeps the layout usable without precision dragging.
+ *
+ * At 24px it is the one target narrower than the 44px floor, recorded as such in
+ * the design document. A 44px strip would swallow clicks meant for the list along
+ * that whole edge, and it has alternatives: it takes focus, answers the arrow
+ * keys, and a double click restores the default width.
+ */
+.workspace-handle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  right: -12px;
+  width: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.workspace-handle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background 120ms ease;
+}
+
+.workspace-handle:hover::after,
+.workspace-handle:focus-visible::after,
+.workspace-handle[data-dragging="true"]::after {
+  background: var(--accent);
+}
+
+.workspace-body[data-narrow="true"] .workspace-handle {
+  display: none;
+}
+
+/* The column's own voice. It sits above the filter so it is read first. */
+.navigator-note {
+  margin: 0;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.navigator-note[data-phase="failed"] {
+  border-left: 2px solid var(--danger);
+  color: var(--danger);
+}
+
+/* A call the binary actually contains. It looks like a link because it is one. */
+.tok-jump {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #8f4508;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(143, 69, 8, 0.35);
+  text-underline-offset: 2px;
+}
+
+.tok-jump:hover {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  text-decoration-color: currentColor;
+}

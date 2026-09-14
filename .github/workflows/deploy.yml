@@ -1,0 +1,127 @@
+name: Deploy Repi
+
+# The deployed site needs the engine, and the engine is not in this repository.
+# `public/kuna/` is gitignored build output, so this job builds Kuna from source
+# before it builds the page. Without that step the site would deploy cleanly and
+# every native binary would report the engine as missing — a working site with a
+# dead feature, which is the failure this pipeline exists to prevent.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    # Everything in this repository is the deployed site, so there is no path list to
+    # keep in step with a layout: a documentation-only edit deploys, which is a
+    # minute of CI rather than a wrong build.
+    paths:
+      - "**"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # `build:kuna` reads this; it defaults to ~/zhome/kuna for local work.
+  KUNA_REPO: ${{ github.workspace }}/kuna
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Repi
+        uses: actions/checkout@v4
+
+      - name: Check out Kuna
+        uses: actions/checkout@v4
+        with:
+          repository: Noelo-Lab/kuna
+          path: kuna
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      # Measured on the first real run, with no cache: the whole job is 2m29s, of
+      # which the SLEIGH specs are 34s and the engine — 43 crates on the wasm
+      # target, plus the compiler natively — is 81s. The cache is here because
+      # that was the *first* run and there is no reason for the second to pay it
+      # again, not because the build is slow.
+      - name: Cache the Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: kuna/decompiler
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Before the wasm, because `build:kuna` refuses to assemble a tree with no
+      # `.sla` in it and says so.
+      - name: Compile the SLEIGH specs
+        working-directory: kuna
+        run: make specs
+
+      - name: Build the engine and assemble it
+        run: npm run build:kuna
+
+      # The engine is 25 MB of output that this job is responsible for producing
+      # and that nothing else would notice was absent. Both of these have been
+      # real failures in this project: a path that pointed at the wrong directory,
+      # and an availability probe that believed a 200 from an SPA fallback.
+      - name: Check the engine is actually in the build
+        run: |
+          set -eu
+          size=$(wc -c < public/kuna/kuna_wasm.wasm)
+          if [ "$size" -lt 1000000 ]; then
+            echo "::error::kuna_wasm.wasm is $size bytes — the engine did not build"
+            exit 1
+          fi
+          specs=$(find public/kuna/specs -name '*.sla' | wc -l)
+          if [ "$specs" -eq 0 ]; then
+            echo "::error::no .sla under public/kuna/specs"
+            exit 1
+          fi
+          echo "engine: $((size / 1024 / 1024)) MB of wasm, $specs .sla files"
+
+      # The strongest check available before shipping: run the engine on a real
+      # binary, through a host that has nothing to do with the browser. If this
+      # passes, what is about to be deployed can decompile.
+      - name: Prove it decompiles
+        run: |
+          node scripts/kuna-oracle.mjs list sample.elf > /tmp/kuna-list.json
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const { count } = JSON.parse(readFileSync("/tmp/kuna-list.json", "utf8"));
+            if (!(count > 0)) {
+              console.error("::error::the engine listed no functions");
+              process.exit(1);
+            }
+            console.log(`the engine lists ${count} functions`);
+          '
+
+      - name: Build Repi
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
