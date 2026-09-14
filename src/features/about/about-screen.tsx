@@ -5,7 +5,7 @@ import { StructureField } from "./structure-field";
 import "./about-screen.css";
 
 /** The command that installs the Pi package half of Repi. */
-const QUICK_START = "pi install https://github.com/TsingShui/Repi";
+const QUICK_START = "pi install https://github.com/TsingShui/pi-re";
 
 export interface AboutScreenProps {
   /** Back to the conversation, which is the home surface. */
@@ -101,9 +101,9 @@ export function AboutScreen(props: AboutScreenProps) {
           <section class="about-section">
             <h2 class="about-heading">The other half</h2>
             <p class="about-body">
-              Repi is two things, installed separately. This is the application — the surface that reads
-              a binary on your device. The toolchain is a Pi package: a catalog of CLI tools and the
-              commands that check each one resolves.
+              Repi runs in a browser, and a browser caps what it can be: performance and extensibility
+              both have a ceiling here. pi-re is the same practice as a Pi Agent extension, running in
+              your own agent with your own tools installed. Install it to work locally:
             </p>
             <div class="quick-start">
               <code class="quick-start-command" ref={(node) => (commandNode = node)}>

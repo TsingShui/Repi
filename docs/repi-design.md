@@ -86,10 +86,16 @@ halves of one capsule, which was the right control on a landing page whose only 
 to take a file; on a page you read, a call to action in the middle of the prose is a
 detour, and the conversation is one tap away with the same two ways in.
 
-**The other half.** The install command for the Pi package with a copy control: the
-command in a bordered box at reading size, and a copy button. The first version was
-10px mono and read as small print nobody follows, and a refused clipboard selects the
-command rather than doing nothing visible.
+**The other half.** Why the package exists and the command that installs it, with a
+copy control: the command in a bordered box at reading size, and a copy button. The
+first version was 10px mono and read as small print nobody follows, and a refused
+clipboard selects the command rather than doing nothing visible.
+
+The paragraph says what the browser costs — performance and extensibility have a
+ceiling in a tab — and that pi-re is the same practice as a Pi Agent extension, running
+in an agent with the reader's own tools installed. The command had been pointing at
+this repository, which carries no `pi` field and therefore installs nothing; it points
+at the package.
 
 **What it is built on.** What this application redistributes and the terms each part
 comes under, with Repi's own licence first: the engines whose binaries ship with the
