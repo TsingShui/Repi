@@ -152,10 +152,6 @@ export function ChatScreen(props: ChatScreenProps) {
                 <h1 class="chat-greeting">
                   What are we <em>looking at</em>?
                 </h1>
-                <p class="chat-lede">
-                  Analysis runs on this device. Drop a binary and I will say what it is — the
-                  conversation itself does not answer yet.
-                </p>
               </section>
             </Show>
 
@@ -259,10 +255,6 @@ export function ChatScreen(props: ChatScreenProps) {
               </button>
             </div>
           </form>
-
-          <p class="composer-note">
-            No model is connected — nothing you type, and no file you drop, leaves this device.
-          </p>
         </div>
       </main>
     </>

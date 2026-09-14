@@ -72,14 +72,6 @@
   color: var(--accent);
 }
 
-.chat-lede {
-  max-width: 62ch;
-  margin-top: 14px;
-  color: var(--ink-muted);
-  font-size: 15px;
-  line-height: 1.55;
-}
-
 /* ========================================================== transcript */
 
 .line {
@@ -275,15 +267,4 @@
 
 .composer-input::placeholder {
   color: var(--ink-faint);
-}
-
-/*
- * The claim the product is built on, under the box and always visible: made once
- * at the top of a scroll it would be a claim the user stops being able to check.
- */
-.composer-note {
-  margin-top: 14px;
-  color: var(--ink-faint);
-  font-size: 12.5px;
-  text-align: center;
 }
