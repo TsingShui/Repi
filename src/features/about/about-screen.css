@@ -146,15 +146,6 @@
   background: var(--canvas-raised);
 }
 
-.credit-group {
-  margin-top: 30px;
-  color: var(--ink-muted);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .credit-head {
   display: flex;
   flex-wrap: wrap;

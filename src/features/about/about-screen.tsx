@@ -1,14 +1,11 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
-import { CREDITS, PROJECT, SCOPE_LABELS, type CreditScope } from "./credits";
+import { CREDITS, PROJECT } from "./credits";
 import { StructureField } from "./structure-field";
 import "./about-screen.css";
 
 /** The command that installs the Pi package half of Repi. */
 const QUICK_START = "pi install https://github.com/TsingShui/Repi";
-
-/** What you get, then what shows it, then what built it. */
-const SCOPE_ORDER: readonly CreditScope[] = ["engine", "upstream"];
 
 export interface AboutScreenProps {
   /** Back to the conversation, which is the home surface. */
@@ -152,24 +149,17 @@ export function AboutScreen(props: AboutScreenProps) {
               <p class="credit-note">This application, under the licence every part of it uses.</p>
             </div>
 
-            <For each={SCOPE_ORDER}>
-              {(scope) => (
-                <Show when={CREDITS.some((credit) => credit.scope === scope)}>
-                  <h3 class="credit-group">{SCOPE_LABELS[scope]}</h3>
-                  <For each={CREDITS.filter((credit) => credit.scope === scope)}>
-                    {(credit) => (
-                      <div class="credit" data-testid="credit" data-credit={credit.name}>
-                        <div class="credit-head">
-                          <a class="credit-name" href={credit.url} rel="noreferrer">
-                            {credit.name}
-                          </a>
-                          <span class="credit-license">{credit.license}</span>
-                        </div>
-                        <p class="credit-note">{credit.note}</p>
-                      </div>
-                    )}
-                  </For>
-                </Show>
+            <For each={CREDITS}>
+              {(credit) => (
+                <div class="credit" data-testid="credit" data-credit={credit.name}>
+                  <div class="credit-head">
+                    <a class="credit-name" href={credit.url} rel="noreferrer">
+                      {credit.name}
+                    </a>
+                    <span class="credit-license">{credit.license}</span>
+                  </div>
+                  <p class="credit-note">{credit.note}</p>
+                </div>
               )}
             </For>
 

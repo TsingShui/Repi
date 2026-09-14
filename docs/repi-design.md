@@ -92,15 +92,17 @@ command rather than doing nothing visible.
 
 **What it is built on.** What this application redistributes and the terms each part
 comes under, with Repi's own licence first: the engines whose binaries ship with the
-page, and the project one of them was rewritten from. Grouped by where a project ends
-up, which is the part a licence question turns on.
+page, then the project one of them was rewritten from. Four rows, flat.
 
-Libraries that end up inside the bundle and tools that only ran while building it are
-not listed, and the licence texts themselves are not reproduced — each travels beside
-the artifact that needs it. The first version listed all of it, grouped four ways, and
-said where every file could be found; a reader deciding whether to trust the page is
-not doing an audit, and six rows of MIT licences for npm packages answered a question
-nobody asks at that moment.
+It has been three lists. The first grouped everything four ways — in the page, beside a
+file, used to build it — and said where each licence file could be found; the second
+dropped the npm packages and the note about where the texts live. The groupings went
+last: they were a taxonomy doing the work of an argument the reader was not having, and
+the two headings that survived explained the difference between "shipped" and "was
+forked from" to somebody who only wanted to know what they were receiving. Libraries
+inside the bundle and build tooling are not listed at all — they are package
+dependencies — and the licence texts are not reproduced, because each one travels
+beside the artifact that needs it.
 
 Behind all of it, the structure field: an abstract view of an address space being read
 on this device. Decoration with a budget — 30 fps, a static frame under
