@@ -1,58 +1,83 @@
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
 import { createFinePointer } from "./lib/pointer";
 import { detectFormat } from "./lib/detect-format";
-import { HomeScreen } from "./features/home/home-screen";
+import { AboutScreen } from "./features/about/about-screen";
+import { ChatScreen, type ChatLine } from "./features/chat/chat-screen";
 import { LicensesScreen } from "./features/licenses/licenses-screen";
 import "./app.css";
 
 /**
- * The licences page is a hash route rather than a mode of the home page.
- *
- * It has nothing to do with a file, it is reached from the home screen, and it
- * has to be readable before any engine is installed — which is when the licence
- * question is most likely to be asked. A hash keeps it working on a static host
- * with no rewrite rules.
+ * The conversation is the home page and has no route of its own. About and the
+ * licence list are pages reached from it, and both are hash routes because the
+ * deployment is a static host with no rewrite rules.
  */
-function route(): "licenses" | null {
+function route(): "about" | "licenses" | null {
   if (typeof window === "undefined") return null;
-  return window.location.hash === "#/licenses" ? "licenses" : null;
+  const hash = window.location.hash.replace(/^#\/?/, "");
+  return hash === "about" || hash === "licenses" ? hash : null;
 }
 
 export function App() {
   const [page, setPage] = createSignal(route());
+  const [lines, setLines] = createSignal<readonly ChatLine[]>([]);
   const [dragging, setDragging] = createSignal(false);
-  const [busy, setBusy] = createSignal(false);
-  const [notice, setNotice] = createSignal<string | null>(null);
   const finePointer = createFinePointer();
 
   const onHashChange = () => setPage(route());
   window.addEventListener("hashchange", onHashChange);
   onCleanup(() => window.removeEventListener("hashchange", onHashChange));
 
+  const append = (...added: readonly ChatLine[]) =>
+    setLines((current) => [...current, ...added]);
+
   /*
-   * Opening a file lives here rather than in the home page because two things open
-   * files — the picker and the drop — and a drop is accepted anywhere in the
-   * application. One entry point means the two paths cannot drift apart in what
-   * they accept or in what they say.
-   *
-   * What it does with the file is nothing yet, and that is the current state
-   * rather than a decision: the surface that reads a binary is the Agent surface.
-   * What is left here is the format answer, because a drop that reports nothing at
-   * all reads as a broken drop.
+   * Opening a file lives here rather than in a page, because three things open one:
+   * the entry block on About, the attach control in the composer, and a drop, which
+   * is accepted anywhere in the window. One entry point means the three cannot
+   * drift apart in what they accept or in what they say.
    */
   async function accept(file: File | undefined) {
     if (!file) return;
-    setBusy(true);
-    setNotice(null);
+
+    // Whatever surface it came from, it belongs in the conversation. Going there
+    // first means the file card appears where the user is already looking.
+    window.location.hash = "";
 
     try {
       const format = await detectFormat(file);
-      setNotice(`${format.label} recognised. Nothing reads it yet — the Agent surface is not built.`);
+      append({
+        kind: "file",
+        name: file.name,
+        size: file.size,
+        format: format.label,
+        detail: format.detail,
+        engine: format.engine,
+      });
     } catch {
-      setNotice("The browser could not read this file. It may have been moved or removed.");
-    } finally {
-      setBusy(false);
+      append({
+        kind: "note",
+        text: "The browser could not read this file. It may have been moved or removed.",
+      });
     }
+  }
+
+  /*
+   * Nothing answers yet, and the transcript says so once rather than leaving a send
+   * that visibly does nothing. This line is the placeholder for an answer: it is
+   * where a model's reply appears, with the sentence removed, and it is deliberately
+   * not repeated after the first send.
+   */
+  let saidNothingAnswers = false;
+  function send(text: string) {
+    const added: ChatLine[] = [{ kind: "you", text }];
+    if (!saidNothingAnswers) {
+      saidNothingAnswers = true;
+      added.push({
+        kind: "note",
+        text: "Nothing is connected to this conversation yet, so this message stayed on this device and nothing answered.",
+      });
+    }
+    append(...added);
   }
 
   // Depth counter, because dragenter fires again for every child the pointer
@@ -104,20 +129,22 @@ export function App() {
   return (
     <div class="app" data-pointer={finePointer() ? "fine" : "coarse"}>
       <Switch>
+        <Match when={page() === "about"}>
+          <AboutScreen
+            onPick={(file) => void accept(file)}
+            dropActive={dragging()}
+            onClose={() => (window.location.hash = "")}
+          />
+        </Match>
         <Match when={page() === "licenses"}>
           <LicensesScreen onClose={() => (window.location.hash = "")} />
         </Match>
         <Match when={true}>
-          <HomeScreen
-            busy={busy()}
-            notice={notice()}
-            dropActive={dragging()}
-            onPick={(file) => void accept(file)}
-          />
+          <ChatScreen lines={lines()} onSend={send} onPick={(file) => void accept(file)} />
         </Match>
       </Switch>
 
-      {/* Covers the whole screen, including the top bar, because the drop is accepted there too. */}
+      {/* Covers the whole screen, because the drop is accepted anywhere on it. */}
       <div class="drop-glow" data-active={dragging() ? "true" : "false"} aria-hidden="true" />
     </div>
   );

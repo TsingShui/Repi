@@ -7,7 +7,9 @@ carries is text the agent chose out of local analysis — never the file itself.
 
 What is in the repository today is the part of the old build that survives:
 
-- the home page and the file intake (picker, drop, local format detection);
+- the conversation, which is the home surface: a chat shell with no model
+  connected, so it reports and does not answer;
+- the file intake (picker, drop, attach, local format detection);
 - the two engines as **analysers** — Kuna for native binaries, Rasc for APK and
   DEX, both compiled to WebAssembly and run on the device — with their Worker
   transport and the contract they implement. They are not wired to anything yet:
@@ -71,12 +73,13 @@ the promise now that a model request leaves the machine.
 ```text
 src/
   main.tsx                      mount point
-  app.tsx                       the shell: home page, licences route, file intake
+  app.tsx                       the shell: routes, the transcript, every way in
   app.css
   styles/global.css             design tokens and reset
   components/brand-mark.tsx
-  features/home/                the home page, the picker and the drop
-  features/home/structure-field.tsx  full-screen canvas backdrop
+  features/chat/                the conversation: transcript, composer, welcome
+  features/about/               what Repi is, and the other half's install command
+  features/about/structure-field.tsx  full-screen canvas backdrop
   features/licenses/            the licences page and the credits it renders
   lib/detect-format.ts          local format detection, header plus ZIP directory
   lib/sha256.ts                 streaming digest, so a large file is never held
@@ -93,7 +96,7 @@ src/
 
 `/#/licenses` lists what Repi is built on and under which terms, grouped by where
 each project ends up: downloaded with the engine, in the page, or only used to
-build it. It is reachable from the home page and needs no engine installed.
+build it. It is reachable from the top bar and needs no engine installed.
 
 ### Building the engines
 

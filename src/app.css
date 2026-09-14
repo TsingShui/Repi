@@ -136,3 +136,33 @@
   font-weight: 720;
   letter-spacing: -0.02em;
 }
+
+/*
+ * The bar's links. Two surfaces carry them — the conversation and About — so they
+ * live with the bar rather than with either page.
+ */
+.top-bar-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.top-bar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.top-bar-link:hover {
+  color: var(--accent);
+}
+
+.top-bar-link-arrow {
+  font-size: 9px;
+}

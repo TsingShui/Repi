@@ -1,38 +1,47 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
 import { StructureField, type StructureFieldApi } from "./structure-field";
-import "./home-screen.css";
+import "./about-screen.css";
 
 /** The command that installs the Pi package half of Repi. */
 const QUICK_START = "pi install https://github.com/TsingShui/Repi";
 
-export interface HomeScreenProps {
-  /** A file was chosen. The application decides whether it can be opened. */
+export interface AboutScreenProps {
+  /** A file was chosen. The application reads it and says so in the conversation. */
   readonly onPick: (file: File | undefined) => void;
-  /** A file is being read right now, so the button says so. */
-  readonly busy: boolean;
-  /** Why the last file could not be opened. Null when there is nothing to say. */
-  readonly notice: string | null;
   /** A file is being carried over the window, so the drop block should say so. */
   readonly dropActive: boolean;
+  /** Back to the conversation, which is the home surface. */
+  readonly onClose: () => void;
 }
 
-export function HomeScreen(props: HomeScreenProps) {
+/**
+ * What Repi is, for someone deciding whether to use it.
+ *
+ * This page was the home page until the conversation took that place. It is kept
+ * as a page rather than deleted because everything on it is about the product
+ * rather than about a file: the promise, the two ways in, and the command that
+ * installs the other half of Repi.
+ */
+export function AboutScreen(props: AboutScreenProps) {
   const [copyState, setCopyState] = createSignal<"idle" | "copied" | "selected">("idle");
   let commandNode: HTMLElement | undefined;
 
   let field: StructureFieldApi | undefined;
 
   /*
-   * The drop is handled by the application, because it is accepted over the
-   * workspace too. The field only needs to answer the file that actually arrived,
-   * so it is pulsed from the picker here rather than from a drag state it would
-   * have to watch.
+   * The drop is handled by the application, because it is accepted over every
+   * surface. The field only needs to answer the file that actually arrived, so it
+   * is pulsed from the picker here rather than from a drag state it would have to
+   * watch.
    */
-  /** The same control the drop block falls back to, so neither block is a dead end. */
-  const openPicker = () => {
-    document.querySelector<HTMLInputElement>(".file-input")?.click();
-  };
+  /**
+   * The same control the drop block falls back to, so neither block is a dead end.
+   * A ref rather than a querySelector: the shell now mounts more than one page, and
+   * a query would find whichever hidden input happened to be in the document.
+   */
+  let pickerInput: HTMLInputElement | undefined;
+  const openPicker = () => pickerInput?.click();
 
   const pick = (file: File | undefined) => {
     if (!file) return;
@@ -42,9 +51,9 @@ export function HomeScreen(props: HomeScreenProps) {
 
   /*
    * The install line is for the other half of Repi: the Pi package that carries
-   * the toolchain, which is a different thing from this page's workspace. The
-   * command is on screen and selectable either way, so a refused clipboard is
-   * not worth an error — copying is the convenience, not the content.
+   * the toolchain, which is a different thing from this application. The command is
+   * on screen and selectable either way, so a refused clipboard is not worth an
+   * error — copying is the convenience, not the content.
    */
   const copyCommand = async () => {
     try {
@@ -89,15 +98,21 @@ export function HomeScreen(props: HomeScreenProps) {
 
       <header class="top-bar">
         <div class="top-bar-group">
-          <BrandMark />
+          <button class="top-bar-back" type="button" onClick={props.onClose} aria-label="Back to home">
+            <BrandMark />
+          </button>
           <span class="brand-name">Repi</span>
+          <span class="top-bar-sep" aria-hidden="true">
+            |
+          </span>
+          <span class="top-bar-title">About</span>
         </div>
         <nav class="top-bar-links" aria-label="About this project">
           <a class="top-bar-link" href="https://github.com/TsingShui/Repi" rel="noreferrer">
             GitHub
           </a>
           <a class="top-bar-link" href="https://tsingshui.art/about" rel="noreferrer">
-            About<span class="top-bar-link-arrow" aria-hidden="true">↗</span>
+            Who makes it<span class="top-bar-link-arrow" aria-hidden="true">↗</span>
           </a>
           <a class="top-bar-link" href="#/licenses" data-testid="licenses-link">
             Licenses
@@ -105,8 +120,8 @@ export function HomeScreen(props: HomeScreenProps) {
         </nav>
       </header>
 
-      <main class="home">
-        <section class="home-hero">
+      <main class="about">
+        <section class="about-hero">
           <p class="eyebrow">EDGE-NATIVE REVERSE ENGINEERING</p>
           <h1 class="hero-title">
             Your device
@@ -132,15 +147,16 @@ export function HomeScreen(props: HomeScreenProps) {
                 extension, and iPadOS hides files that fail a type filter.
               */}
               <input
-                class="file-input"
+                class="visually-hidden"
                 type="file"
+                ref={(node) => (pickerInput = node)}
                 onChange={(event) => {
                   const picked = event.currentTarget.files?.[0];
                   event.currentTarget.value = "";
                   pick(picked);
                 }}
               />
-              <span class="entry-block-label">{props.busy ? "Reading…" : "Open"}</span>
+              <span class="entry-block-label">Open</span>
             </label>
 
             <button
@@ -156,19 +172,6 @@ export function HomeScreen(props: HomeScreenProps) {
           </div>
 
           <span class="format-list">ELF · PE · MACH-O · APK · DEX</span>
-
-          {/*
-            Only refusals are reported here. A file Repi can open goes straight to
-            the workspace — showing what was recognised first made opening a file
-            feel like two steps, and the workspace already opens on that readout.
-          */}
-          <Show when={props.notice}>
-            {(message) => (
-              <p class="home-notice" role="status">
-                {message()}
-              </p>
-            )}
-          </Show>
 
           <div class="quick-start">
             <p class="quick-start-lead">Want more? Try the full Extension version</p>
@@ -190,10 +193,6 @@ export function HomeScreen(props: HomeScreenProps) {
           </div>
         </section>
       </main>
-
-      <p class="visually-hidden" aria-live="polite">
-        {props.busy ? "Reading the file on this device." : (props.notice ?? "")}
-      </p>
     </>
   );
 }

@@ -1,30 +1,4 @@
-.top-bar-links {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.top-bar-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  color: var(--ink-faint);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-decoration: none;
-}
-
-.top-bar-link:hover {
-  color: var(--accent);
-}
-
-.top-bar-link-arrow {
-  font-size: 9px;
-}
-
-.home {
+.about {
   position: relative;
   z-index: 1;
   display: flex;
@@ -33,7 +7,7 @@
   overflow-y: auto;
 }
 
-.home-hero {
+.about-hero {
   display: flex;
   /* Fills the page: the hero is the whole home screen now that the footer is
      gone, and it grows so a long notice never collides with the edge. */
@@ -145,15 +119,11 @@
 }
 
 /* The native control stays in the layout so assistive tech still reaches it. */
-.file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  clip-path: inset(50%);
-}
+/*
+ * The file input is `.visually-hidden` from the global styles: the label around it
+ * is the control, and hiding the input rather than the label keeps the platform
+ * picker reachable from the keyboard and from a screen reader.
+ */
 
 /*
  * The install line for the Pi package, which is the other half of Repi. It sits
@@ -240,7 +210,7 @@
 }
 
 /* A refusal, not a readout: one line, and no table under it. */
-.home-notice {
+.about-notice {
   max-width: 620px;
   margin-top: 22px;
   border-left: 2px solid var(--danger);
