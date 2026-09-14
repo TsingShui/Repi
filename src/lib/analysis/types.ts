@@ -1,15 +1,16 @@
 /**
- * The analysis surface the workspace talks to.
+ * The analysis surface an engine implements.
  *
- * Nothing in this file knows about Kuna, Rasc, WebAssembly or Workers. The
- * workspace renders whatever an `AnalysisSource` reports — including which parts
- * of the surface it cannot answer — so the engine can be swapped in behind this
- * boundary without the UI changing.
+ * Nothing in this file knows about Kuna, Rasc, WebAssembly or Workers, and
+ * nothing outside `lib/analysis/` calls it right now: the UI that used to render
+ * an `AnalysisSource` was removed with the workspace. It is kept because it is the
+ * boundary an engine is reached through, and because `npm run check:analysis`
+ * still holds the adapters behind it to it.
  *
  * Two rules shape the shape of this interface:
  *
  *  - Large collections are never returned by reference into reactive state. The
- *    source owns its arrays and hands out read-only views; the UI subscribes to
+ *    source owns its arrays and hands out read-only views; a caller subscribes to
  *    `revision()` and re-reads what it needs.
  *  - Scanning is incremental. A binary is usable long before it is fully
  *    analysed, so discovery reports progress instead of returning one finished

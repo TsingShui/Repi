@@ -1,15 +1,12 @@
 import { createSignal, Match, onCleanup, Switch } from "solid-js";
 import { createFinePointer } from "./lib/pointer";
-import { detectFormat, type FormatMatch } from "./lib/detect-format";
-import { chooseSource } from "./lib/analysis/choose-source";
-import type { AnalysisSource } from "./lib/analysis/types";
+import { detectFormat } from "./lib/detect-format";
 import { HomeScreen } from "./features/home/home-screen";
 import { LicensesScreen } from "./features/licenses/licenses-screen";
-import { Workspace } from "./features/workspace/workspace";
 import "./app.css";
 
 /**
- * The licences page is a hash route rather than a mode of the workspace.
+ * The licences page is a hash route rather than a mode of the home page.
  *
  * It has nothing to do with a file, it is reached from the home screen, and it
  * has to be readable before any engine is installed — which is when the licence
@@ -21,35 +18,27 @@ function route(): "licenses" | null {
   return window.location.hash === "#/licenses" ? "licenses" : null;
 }
 
-interface Session {
-  readonly file: File;
-  readonly format: FormatMatch;
-  /**
-   * Chosen before the workspace mounts, so the workspace always has an engine and
-   * never has to render a half-built state. A file this build cannot analyse does
-   * not open a workspace at all.
-   */
-  readonly source: AnalysisSource;
-}
-
 export function App() {
-  const [session, setSession] = createSignal<Session | null>(null);
   const [page, setPage] = createSignal(route());
-
-  const onHashChange = () => setPage(route());
-  window.addEventListener("hashchange", onHashChange);
-  onCleanup(() => window.removeEventListener("hashchange", onHashChange));
   const [dragging, setDragging] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [notice, setNotice] = createSignal<string | null>(null);
   const finePointer = createFinePointer();
 
+  const onHashChange = () => setPage(route());
+  window.addEventListener("hashchange", onHashChange);
+  onCleanup(() => window.removeEventListener("hashchange", onHashChange));
+
   /*
-   * Opening a file lives here rather than in the home screen because two things
-   * open files — the picker and the drop — and a drop is accepted anywhere in the
-   * application, including over the workspace. Keeping one entry point means the
-   * two paths cannot drift apart in what they accept or what they say when they
-   * refuse.
+   * Opening a file lives here rather than in the home page because two things open
+   * files — the picker and the drop — and a drop is accepted anywhere in the
+   * application. One entry point means the two paths cannot drift apart in what
+   * they accept or in what they say.
+   *
+   * What it does with the file is nothing yet, and that is the current state
+   * rather than a decision: the surface that reads a binary is the Agent surface.
+   * What is left here is the format answer, because a drop that reports nothing at
+   * all reads as a broken drop.
    */
   async function accept(file: File | undefined) {
     if (!file) return;
@@ -58,27 +47,7 @@ export function App() {
 
     try {
       const format = await detectFormat(file);
-
-      if (format.engine !== null) {
-        const chosen = await chooseSource(file, format);
-        if (chosen.source === null) {
-          // Recognised, but this deployment has no engine for it. That is a
-          // refusal like any other, and it is said out loud rather than dressed
-          // up as a result.
-          setNotice(chosen.unavailable);
-          return;
-        }
-        setSession({ file, format, source: chosen.source });
-        return;
-      }
-
-      /*
-       * Only the files that cannot be opened produce a message. A recognised file
-       * goes straight to the workspace: the readout that used to sit here was the
-       * workspace's opening screen shown one step early, and it made opening a
-       * file feel like a two-stage process.
-       */
-      setNotice(`No Repi engine handles ${format.label} yet. Native archives such as JAR, AAR and plain ZIP are not in this build.`);
+      setNotice(`${format.label} recognised. Nothing reads it yet — the Agent surface is not built.`);
     } catch {
       setNotice("The browser could not read this file. It may have been moved or removed.");
     } finally {
@@ -133,29 +102,10 @@ export function App() {
   });
 
   return (
-    <div
-      class="app"
-      data-surface={session() ? "workspace" : "home"}
-      data-pointer={finePointer() ? "fine" : "coarse"}
-    >
-      {/*
-        Three surfaces, one of which is showing. `Switch` rather than nested
-        `Show`s because nesting makes the truthiness of one condition narrow the
-        other, and the page and the session are unrelated facts.
-      */}
+    <div class="app" data-pointer={finePointer() ? "fine" : "coarse"}>
       <Switch>
         <Match when={page() === "licenses"}>
           <LicensesScreen onClose={() => (window.location.hash = "")} />
-        </Match>
-        <Match when={session()}>
-          {(current) => (
-            <Workspace
-              file={current().file}
-              format={current().format}
-              source={current().source}
-              onClose={() => setSession(null)}
-            />
-          )}
         </Match>
         <Match when={true}>
           <HomeScreen

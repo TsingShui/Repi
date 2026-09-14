@@ -1,10 +1,19 @@
 # Repi browser application design
 
-> Status: accepted direction. The home screen and the analysis workspace ship in
-> this repository, a pinned Solid 2 project of its own. Native binaries are
-> analysed by the real Kuna engine and APK/DEX files by the real Rasc engine, both
-> compiled to WebAssembly and run in Workers of their own; local project storage
-> and the Agent surface are not implemented yet.
+> **Status: the workspace it describes has been removed.** Repi is being rebuilt as
+> an Agent surface: one conversation, a binary dropped into it, and analysis tools
+> running on the device, with only text the agent chooses leaving the machine in a
+> model request. The workspace — the screen behind the home page, with tabs, a
+> navigator and views — is gone, along with its own design document, its demos and
+> its browser checks.
+>
+> What in here is still current: the two-halves split with the Pi package, the
+> deployment shape, the data-handling rules, and `## Future Agent design`, which is
+> the plan rather than a future.
+>
+> What is not: everything that describes the workspace as shipped, and the absolute
+> form of the promise that a binary never leaves the device — a model request does
+> leave it, and what it carries is the part still to be specified.
 
 ### Two halves, two repositories
 
@@ -14,9 +23,10 @@ rather than pretending they are one.
 - **The Pi package.** `pi install https://github.com/TsingShui/pi-re` adds a
   toolchain catalog and the commands that check it. It runs in an agent, on the
   machine, next to the tools it describes.
-- **The workspace.** This repository is the browser application documented in
-  [`repi-decompile-design.md`](./repi-decompile-design.md), which opens a binary
-  and reads it locally.
+- **The workspace.** This repository is the browser application. The workspace UI
+  that used to open a binary and read it locally has been removed; what replaces
+  it is the Agent surface, and it is not built yet. The design document that
+  specified the workspace went with it.
 
 The two shared one repository while the application was being built, and were split
 when the names were settled: the application is Repi, the package is `pi-re`.
@@ -295,10 +305,12 @@ The interface is touch-first rather than a compressed desktop IDE.
 - Avoid a permanent three-column layout on narrow screens.
 - Keep the privacy/network status visible rather than buried in settings.
 
-The workspace screen that follows file selection is specified in
-[Repi decompile workspace design](./repi-decompile-design.md), which refines the
-input model above: the workspace is touch-first, but a Magic Keyboard's pointer
-and keyboard are treated as accelerators rather than ignored.
+The workspace screen that used to follow file selection was specified in a
+separate document, "Repi decompile workspace design", which refined the input
+model above: the workspace was touch-first, but a Magic Keyboard's pointer and
+keyboard were treated as accelerators rather than ignored. That document was
+removed with the workspace; the paragraph above is what survives of the input
+model, and it applies to the Agent surface too.
 
 ## Performance requirements
 

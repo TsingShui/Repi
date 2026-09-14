@@ -9,8 +9,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node ./scripts/ship-licence.mjs",
     "preview": "vite preview --port 4173",
-    "smoke": "node ./scripts/smoke.mjs",
-    "verify": "node ./scripts/verify.mjs",
     "check:analysis": "node ./scripts/run-analysis-check.mjs",
     "build:kuna": "node ./scripts/build-kuna.mjs",
     "build:rasc": "node ./scripts/build-rasc.mjs"
