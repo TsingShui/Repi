@@ -90,11 +90,17 @@ command in a bordered box at reading size, and a copy button. The first version 
 10px mono and read as small print nobody follows, and a refused clipboard selects the
 command rather than doing nothing visible.
 
-**What it is built on.** The credits, grouped by where each project ends up — the part
-a licence question turns on — with this application's own licence first. The licence
-texts are not reproduced: each one travels beside the artifact that needs it, and a
-copy on the page would be a fifth copy to keep in sync. The page says where they are
-instead.
+**What it is built on.** What this application redistributes and the terms each part
+comes under, with Repi's own licence first: the engines whose binaries ship with the
+page, and the project one of them was rewritten from. Grouped by where a project ends
+up, which is the part a licence question turns on.
+
+Libraries that end up inside the bundle and tools that only ran while building it are
+not listed, and the licence texts themselves are not reproduced — each travels beside
+the artifact that needs it. The first version listed all of it, grouped four ways, and
+said where every file could be found; a reader deciding whether to trust the page is
+not doing an audit, and six rows of MIT licences for npm packages answered a question
+nobody asks at that moment.
 
 Behind all of it, the structure field: an abstract view of an address space being read
 on this device. Decoration with a budget — 30 fps, a static frame under

@@ -8,7 +8,7 @@ import "./about-screen.css";
 const QUICK_START = "pi install https://github.com/TsingShui/Repi";
 
 /** What you get, then what shows it, then what built it. */
-const SCOPE_ORDER: readonly CreditScope[] = ["engine", "upstream", "page", "build"];
+const SCOPE_ORDER: readonly CreditScope[] = ["engine", "upstream"];
 
 export interface AboutScreenProps {
   /** Back to the conversation, which is the home surface. */
@@ -173,13 +173,6 @@ export function AboutScreen(props: AboutScreenProps) {
               )}
             </For>
 
-            <p class="about-body about-body-quiet">
-              Each engine's <code>LICENSE</code> and <code>NOTICE</code> travel with its artifact — Kuna's
-              are copied next to the WebAssembly when it is built, as <code>/kuna/KUNA-LICENSE</code> and
-              <code>/kuna/KUNA-NOTICE</code>, and Rasc's are copied beside its module the same way.
-              Repi's own is served at <code>/LICENSE</code> and <code>/NOTICE</code> beside this page,
-              because serving it is distributing it.
-            </p>
           </section>
         </div>
       </main>

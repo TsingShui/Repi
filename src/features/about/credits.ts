@@ -1,11 +1,13 @@
 /**
- * What Repi is built on.
+ * What Repi redistributes.
  *
  * Two rules keep this list honest.
  *
- * **Scope is stated.** Something that ships inside the page is a different claim
- * from something that only ran on the author's machine while building it, and a
- * reader checking a licence needs to know which one they are looking at.
+ * **Scope is stated.** Something downloaded beside a file is a different claim from
+ * something an engine was rewritten from, and a reader checking a licence needs to
+ * know which one they are looking at. Libraries that end up inside the bundle and
+ * tools that only ran while building it are not here: they are package dependencies,
+ * and this page is for what a user receives.
  *
  * **The licence text is not reproduced here.** Apache-2.0 requires that a
  * recipient gets a copy of the licence, and they do: `npm run build:kuna` and
@@ -17,7 +19,7 @@
  */
 
 /** Where a project ends up, which is the part a licence question turns on. */
-export type CreditScope = "engine" | "upstream" | "page" | "build";
+export type CreditScope = "engine" | "upstream";
 
 export interface Credit {
   readonly name: string;
@@ -30,8 +32,6 @@ export interface Credit {
 export const SCOPE_LABELS: Record<CreditScope, string> = {
   engine: "Downloaded when you open a file they handle",
   upstream: "The engine Rasc was rewritten from",
-  page: "In this page",
-  build: "Used to build it",
 };
 
 /** Repi's own licence. Apache-2.0, the same one every engine behind it uses. */
@@ -69,33 +69,5 @@ export const CREDITS: readonly Credit[] = [
     url: "https://github.com/MG1937/ASC",
     scope: "upstream",
     note: "The Android decompiler Rasc is a rewrite of, and the behaviour it is measured against. Nothing here loads it; it is where the DEX side came from.",
-  },
-  {
-    name: "@bjorn3/browser_wasi_shim",
-    license: "MIT OR Apache-2.0",
-    url: "https://github.com/bjorn3/browser_wasi_shim",
-    scope: "page",
-    note: "A WASI implementation in JavaScript. It gives the engine a filesystem that exists only in memory.",
-  },
-  {
-    name: "SolidJS",
-    license: "MIT",
-    url: "https://github.com/solidjs/solid",
-    scope: "page",
-    note: "The user interface, including the virtualised list and the tab strip.",
-  },
-  {
-    name: "Vite",
-    license: "MIT",
-    url: "https://github.com/vitejs/vite",
-    scope: "build",
-    note: "The dev server, and the bundler that produces what is served here.",
-  },
-  {
-    name: "TypeScript",
-    license: "Apache-2.0",
-    url: "https://github.com/microsoft/TypeScript",
-    scope: "build",
-    note: "Types, and the checker that refuses to build when they are wrong.",
   },
 ];
