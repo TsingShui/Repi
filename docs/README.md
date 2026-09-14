@@ -5,4 +5,4 @@
 - [Repi UI demos](./ui-demos.html) — Ink-style interactive tablet mockups for the local entry, Kuna workspace, and Rasc portrait workspace.
 - [Workspace, decided model](./ui-workspace-demo.html) — the C′ skin with a directory left column and jadx-style tabs: a tab is the thing you opened, so two methods are two tabs with their own content, and reopening one focuses it. Verify with `node docs/check-workspace-demo.mjs`.
 - [DEX workspace, four visual directions](./ui-direction-demos.html) — the same DEX decompile screen rendered four ways, with the density and type differences measured rather than asserted. All four respect the 44px touch floor the product enforces; C′ shows what lifting it would buy. Verify with `node docs/check-direction-demos.mjs`.
-- [Working on Repi](../AGENTS.md) — development standards, commands, and the mistakes this project keeps repeating.
+- [Working on Repi](../AGENTS.md) — how to run this repository: the commands, and what deploying takes.
