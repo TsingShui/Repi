@@ -10,12 +10,16 @@
 ## The conversation
 
 The home surface is one conversation: a wide centred column, a transcript, and a
-capsule composer. The shape and the language are both the ones the assistant
-surfaces have settled on — a greeting over the composer when nothing has been said,
-soft radii, one blue accent, a gradient phrase in the greeting and the same gradient
-behind the mark, a composer that docks to the bottom once there is a transcript —
-because a conversation that looks like the ones people already use is one they do
-not have to learn.
+capsule composer. The layout is the one the assistant surfaces have settled on — a
+greeting over the composer when nothing has been said, a composer that docks to the
+bottom once there is a transcript, suggestions under it in the empty state — because
+a conversation that looks like the ones people already use is one they do not have
+to learn.
+
+The geometry and the layout are borrowed; the colour is not. The palette is this
+product's own — its accent, its greys, its green for the local-safe signal — and no
+typeface is named after anyone else's product. The one place more than one colour
+appears is the mark, and both its stops come from the accent.
 
 Two states share one DOM rather than two trees behind a `Show`: the same composer
 element is in both, so sending the first message does not move the element the caret

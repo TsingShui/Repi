@@ -30,7 +30,7 @@
  */
 .drop-glow {
   --drop-reach: 15%;
-  --drop-tint: rgb(26 115 232 / 22%);
+  --drop-tint: rgb(77 107 254 / 22%);
 
   position: fixed;
   z-index: 5;
@@ -102,9 +102,9 @@
 }
 
 /*
- * The mark sits on the assistant gradient, which is the one place this product uses
- * more than one colour. It is also the mark beside anything the application says in
- * the conversation, so the two read as the same speaker.
+ * The mark sits on the accent gradient — the borrowed idea, in the product's own
+ * two stops. It is also the mark beside anything the application says in the
+ * conversation, so the two read as the same speaker.
  */
 .brand-mark {
   display: grid;

@@ -67,12 +67,9 @@
   line-height: 1.14;
 }
 
-/* The one place more than one colour is used: the assistant's own mark. */
 .chat-greeting em {
   font-style: normal;
-  background: var(--mark-gradient);
-  background-clip: text;
-  color: transparent;
+  color: var(--accent);
 }
 
 .chat-lede {
@@ -182,7 +179,7 @@
 }
 
 .file-card[data-analysable="true"] .file-badge {
-  background: #e6f4ea;
+  background: var(--local-soft);
   color: var(--local);
 }
 
