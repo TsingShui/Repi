@@ -277,44 +277,6 @@
   color: var(--ink-faint);
 }
 
-/* ======================================================== suggestions */
-
-.suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.suggestion {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  background: var(--canvas);
-  color: var(--ink-muted);
-  font-size: 14px;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.suggestion:hover {
-  background: var(--canvas-raised);
-  color: var(--ink);
-}
-
-.suggestion svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-
 /*
  * The claim the product is built on, under the box and always visible: made once
  * at the top of a scroll it would be a claim the user stops being able to check.

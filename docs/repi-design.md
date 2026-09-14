@@ -12,9 +12,8 @@
 The home surface is one conversation: a wide centred column, a transcript, and a
 capsule composer. The layout is the one the assistant surfaces have settled on — a
 greeting over the composer when nothing has been said, a composer that docks to the
-bottom once there is a transcript, suggestions under it in the empty state — because
-a conversation that looks like the ones people already use is one they do not have
-to learn.
+bottom once there is a transcript — because a conversation that looks like the ones
+people already use is one they do not have to learn.
 
 The geometry and the layout are borrowed; the colour and the type are not. The
 palette is this product's own — its accent, its greys, its green for the local-safe
@@ -25,8 +24,8 @@ only where something is actionable, or where a word is the page's point.
 Two states share one DOM rather than two trees behind a `Show`: the same composer
 element is in both, so sending the first message does not move the element the caret
 is in. With nothing said yet the block is centred in the window, a little above the
-middle, with two suggestions under the composer; once there is a transcript the
-column sits against the composer and the suggestions go away.
+middle; once there is a transcript the column sits against the composer and the
+composer docks to the bottom.
 
 The earlier direction was the opposite of this one — sharp geometry, no rounded
 corners, a hairline on everything — and it was written for a workspace of tables and

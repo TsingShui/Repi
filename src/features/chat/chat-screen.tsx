@@ -114,9 +114,8 @@ export function ChatScreen(props: ChatScreenProps) {
   };
 
   /*
-   * `onPick` is passed down rather than closed over: `FileInput` is rendered twice —
-   * once in the composer, once behind the suggestion — and a component is called
-   * per use, while a JSX value would be one node moved between them.
+   * `onPick` is passed down rather than closed over: a component is called per use,
+   * while a JSX value would be one node that moves.
    */
 
   return (
@@ -260,29 +259,6 @@ export function ChatScreen(props: ChatScreenProps) {
               </button>
             </div>
           </form>
-
-          {/*
-            Two things that work today, rather than suggested prompts this build
-            cannot answer. They go away once the conversation starts.
-          */}
-          <Show when={empty()}>
-            <div class="suggestions">
-              <label class="suggestion">
-                <FileInput onPick={props.onPick} />
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Open a binary
-              </label>
-              <a class="suggestion" href="#/about">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 11v5M12 8h.01" />
-                </svg>
-                About Repi
-              </a>
-            </div>
-          </Show>
 
           <p class="composer-note">
             No model is connected — nothing you type, and no file you drop, leaves this device.
