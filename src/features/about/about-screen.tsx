@@ -86,14 +86,6 @@ export function AboutScreen(props: AboutScreenProps) {
           </span>
           <span class="top-bar-title">About</span>
         </div>
-        <nav class="top-bar-links" aria-label="Elsewhere">
-          <a class="top-bar-link" href="https://github.com/TsingShui/Repi" rel="noreferrer">
-            GitHub
-          </a>
-          <a class="top-bar-link" href="https://tsingshui.art/about" rel="noreferrer">
-            Who makes it<span class="top-bar-link-arrow" aria-hidden="true">↗</span>
-          </a>
-        </nav>
       </header>
 
       <main class="about">
