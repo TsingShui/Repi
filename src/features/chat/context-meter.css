@@ -1,0 +1,65 @@
+/*
+ * The context meter: a bar that fills and the two numbers behind it.
+ *
+ * Read at a glance from the composer, where it shares a row with the model, the thinking level
+ * and the send button — so it is small on purpose, and it is the numbers rather than the bar that
+ * carry the precision. The bar earns its place by making "nearly full" visible without reading.
+ */
+.context-meter {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 8px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.context-meter-track {
+  display: block;
+  flex: none;
+  width: 34px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--line);
+}
+
+.context-meter-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--local);
+  transition: width 240ms ease;
+}
+
+.context-meter[data-level="working"] .context-meter-fill {
+  background: var(--working);
+}
+
+.context-meter[data-level="danger"] .context-meter-fill {
+  background: var(--danger);
+}
+
+.context-meter[data-level="working"] .context-meter-value,
+.context-meter[data-level="danger"] .context-meter-value {
+  color: var(--ink);
+}
+
+.context-meter-value {
+  white-space: nowrap;
+}
+
+.context-meter-separator {
+  margin: 0 2px;
+  opacity: 0.55;
+}
+
+/* The one thing that must not happen is the row wrapping: the numbers go before the model does. */
+@media (width <= 430px) {
+  .context-meter-value {
+    display: none;
+  }
+}

@@ -11,7 +11,8 @@ import { DeviceDialog } from "./features/devices/device-dialog";
 import { createDeviceStore } from "./features/devices/device-store";
 import { ProviderDialog } from "./features/models/provider-dialog";
 import { createModelStore } from "./features/models/model-store";
-import { thinkingOptions } from "./features/models/thinking";
+import { modelLimits, thinkingOptions, type ModelLimits } from "./features/models/model-facts";
+import { contextUsed } from "./features/chat/context-usage";
 import { StorageDialog } from "./features/storage/storage-dialog";
 import { modelKey, type ModelProvider } from "./features/models/types";
 import "./app.css";
@@ -85,6 +86,24 @@ function MainApp() {
    * reading pi's catalog for a built-in provider — and the answer belongs to the *model*, not to
    * the app: what is offered here is exactly what will be accepted on the wire.
    */
+  /**
+   * What the last exchange carried.
+   *
+   * Two sources, one number: the stored transcript for a conversation that is not running, and
+   * the live report while one is — a turn with tool calls in it is several requests, and the
+   * point of the meter is to be right in the middle of one.
+   */
+  const [liveUsage, setLiveUsage] = createSignal<number | null>(null);
+  createEffect(
+    () => conversations.activeId(),
+    () => {
+      setLiveUsage(null);
+    },
+  );
+  const tokensUsed = () =>
+    liveUsage() ?? contextUsed(conversations.active().agentMessages ?? []);
+
+  const [limits, setLimits] = createSignal<ModelLimits | null>(null);
   const [thinkingLevels, setThinkingLevels] = createSignal<readonly ModelThinkingLevel[]>(["off"]);
   const [effectiveThinkingLevel, setEffectiveThinkingLevel] =
     createSignal<ModelThinkingLevel>("off");
@@ -103,6 +122,7 @@ function MainApp() {
       if (!choice) {
         setThinkingLevels(["off"]);
         setEffectiveThinkingLevel("off");
+        setLimits(null);
         return;
       }
       let current = true;
@@ -112,6 +132,9 @@ function MainApp() {
         // Shown, not stored: the conversation keeps the level it asked for, so switching to a
         // model that lacks it and back again does not quietly rewrite the choice.
         setEffectiveThinkingLevel(options.effective);
+      });
+      void modelLimits(choice.provider, choice.model).then((found) => {
+        if (current) setLimits(found);
       });
       onCleanup(() => {
         current = false;
@@ -222,6 +245,8 @@ function MainApp() {
         onActivity: (activity) => {
           conversations.updateAssistant(conversation.id, lineId, { activity: activity ?? "" });
         },
+        // Live, because a turn is several requests and the meter should be right during one.
+        onUsage: (usage) => setLiveUsage(usage.totalTokens),
       });
       conversations.updateAssistant(conversation.id, lineId, {
         text: result.error
@@ -358,6 +383,8 @@ function MainApp() {
               thinkingLevels={thinkingLevels()}
               thinkingLevel={effectiveThinkingLevel()}
               onSelectThinkingLevel={conversations.selectThinkingLevel}
+              contextUsed={tokensUsed()}
+              modelLimits={limits()}
               onAddProvider={() => setProviderDialogOpen(true)}
               onOpenSidebar={() => setSidebarOpen(true)}
             />

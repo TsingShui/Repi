@@ -4,6 +4,8 @@ import { formatBytes, type EngineId } from "../../lib/detect-format";
 import { StructureField } from "../about/structure-field";
 import { ModelSelector } from "../models/model-selector";
 import { ThinkingSelector } from "../models/thinking-selector";
+import { ContextMeter } from "./context-meter";
+import type { ModelLimits } from "../models/model-facts";
 import type { ModelProvider } from "../models/types";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ChatLine } from "./types";
@@ -25,6 +27,9 @@ export interface ChatScreenProps {
   readonly thinkingLevels: readonly ModelThinkingLevel[];
   readonly thinkingLevel: ModelThinkingLevel;
   readonly onSelectThinkingLevel: (level: ModelThinkingLevel) => void;
+  /** Tokens the last exchange carried, and what this model can hold. */
+  readonly contextUsed: number;
+  readonly modelLimits: ModelLimits | null;
   readonly onSelectModel: (key: string) => void;
   readonly onAddProvider: () => void;
   readonly onOpenSidebar: () => void;
@@ -388,6 +393,9 @@ export function ChatScreen(props: ChatScreenProps) {
                     value={props.thinkingLevel}
                     onSelect={props.onSelectThinkingLevel}
                   />
+                  <Show when={props.modelLimits}>
+                    {(limits) => <ContextMeter used={props.contextUsed} limits={limits()} />}
+                  </Show>
                 </div>
 
                 <Show

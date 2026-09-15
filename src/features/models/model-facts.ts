@@ -1,5 +1,11 @@
 /**
- * Thinking levels, and whose business it is to know them.
+ * What is known about a model: how much it can think, and how much it can hold.
+ *
+ * Both answers come from the same object and the same source — pi's catalog for a built-in
+ * provider, and for a custom endpoint the one model object this app builds because pi cannot
+ * know it. Keeping them together is what stops the app from having two opinions about a model:
+ * a menu that offers a level and then a request that sends another, or a window displayed as one
+ * number and enforced as another.
  *
  * A level is not a property of the app and not a property of the model id as a string: it is a
  * property of *this* model on *this* endpoint. pi already owns that question —
@@ -44,6 +50,19 @@ export function declaresReasoning(provider: ModelProvider, modelId: string): boo
  * it, pi sends `reasoning_effort`; without it, a level is clamped to "off" rather than sent as
  * a field the endpoint never agreed to understand.
  */
+/**
+ * What a custom provider's model is assumed to hold.
+ *
+ * `maxTokens` is not inert: it goes out on every request as `max_completion_tokens`, so a model
+ * whose real ceiling is lower is rejected by its own endpoint. The window is metadata for now —
+ * nothing in the agent reads it — which is exactly why it is worth showing rather than trusting.
+ */
+const ASSUMED_LIMITS: ModelLimits = {
+  contextWindow: 128_000,
+  maxTokens: 16_384,
+  assumed: true,
+};
+
 export function customModel(
   provider: ModelProvider,
   modelId: string,
@@ -57,8 +76,8 @@ export function customModel(
     reasoning: declaresReasoning(provider, modelId),
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128_000,
-    maxTokens: 16_384,
+    contextWindow: ASSUMED_LIMITS.contextWindow,
+    maxTokens: ASSUMED_LIMITS.maxTokens,
   };
 }
 
@@ -113,6 +132,30 @@ export function resolveThinkingLevel(
   requested: ModelThinkingLevel | undefined,
 ): ModelThinkingLevel {
   return clampThinkingLevel(model, requested ?? "off");
+}
+
+/**
+ * What a model can hold, and whether this app knows that or is guessing.
+ *
+ * `assumed` is not decoration. A built-in model's window comes from pi's catalog; a custom
+ * endpoint's comes from a constant in this file, because an OpenAI-compatible endpoint does not
+ * have to describe its models — and a number that was guessed should not be displayed like one
+ * that was read.
+ */
+export interface ModelLimits {
+  readonly contextWindow: number;
+  readonly maxTokens: number;
+  readonly assumed: boolean;
+}
+
+export async function modelLimits(provider: ModelProvider, modelId: string): Promise<ModelLimits> {
+  const model = await modelFor(provider, modelId);
+  if (model === null) return ASSUMED_LIMITS;
+  return {
+    contextWindow: model.contextWindow,
+    maxTokens: model.maxTokens,
+    assumed: provider.kind === "custom",
+  };
 }
 
 /** A model object for the agent loop, built the same way the menu was. */

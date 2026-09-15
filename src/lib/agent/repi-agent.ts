@@ -15,8 +15,9 @@ import { ARCHIVE_PATH } from "../analysis/rasc/wasi";
 import { ENGINE_WASM } from "./sandbox";
 import { detectFormat, type FormatMatch } from "../detect-format";
 import { openSandbox, type SandboxSession } from "./sandbox";
+import type { Usage } from "@earendil-works/pi-ai";
 import type { SandboxOutcome } from "./quickjs-sandbox";
-import { customModel, resolveThinkingLevel } from "../../features/models/thinking";
+import { customModel, resolveThinkingLevel } from "../../features/models/model-facts";
 import { deviceParagraph, deviceTools } from "./device-tools";
 import type { DeviceBridge } from "./device-bridge";
 
@@ -45,6 +46,14 @@ print raw output.`;
 export interface AgentRunCallbacks {
   readonly onText: (text: string) => void;
   readonly onActivity: (activity: string | undefined) => void;
+  /**
+   * What the last exchange cost, once it is known.
+   *
+   * Reported per assistant message rather than once at the end, because a turn is many requests
+   * when tools are involved and the interesting number is the one that keeps growing:
+   * the conversation is not full after the last turn, it is full after the fourth tool call.
+   */
+  readonly onUsage?: (usage: Usage) => void;
 }
 
 export interface AgentRunResult {
@@ -382,6 +391,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
       } else if (event.type === "tool_execution_end") {
         callbacks.onActivity(undefined);
       } else if (event.type === "message_end" && event.message.role === "assistant") {
+        if (event.message.usage) callbacks.onUsage?.(event.message.usage);
         const complete = assistantText(event.message);
         if (complete) {
           currentText = complete;
