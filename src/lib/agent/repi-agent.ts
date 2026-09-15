@@ -130,6 +130,17 @@ export interface AgentRunResult {
   readonly error: string | null;
 }
 
+/**
+ * How long one program may run, measured by the host.
+ *
+ * The interpreter has its own deadline, and it is not enough: it is checked while JavaScript is
+ * running, and a single engine call is one synchronous step inside wasm with nowhere to check —
+ * `kuna` decompiling a whole library is minutes of work the interpreter cannot interrupt. So the
+ * host imposes a ceiling of its own, and enforces it the only way a synchronous guest can be
+ * stopped: by ending the worker it lives in.
+ */
+const PROGRAM_DEADLINE_MS = 120_000;
+
 /** How small a file cannot be a real engine wasm. */
 const MIN_ENGINE_BYTES = 500_000;
 
@@ -258,8 +269,9 @@ There is no network, no filesystem and no import: nothing else is reachable.
 Filter in the engine, not after it. Its output is tens of megabytes on a real APK, one call
 re-walks the archive in a few hundred milliseconds, and everything you print comes back to
 you. Prefer a few well-argued calls over many, and return counts and samples rather than
-tables. A long-running program is interrupted and a memory-heavy one fails with an error you
-can read and fix. Kuna fetches the SLEIGH spec for a binary's architecture on demand: a
+tables. A program is stopped when it runs long — JavaScript at twenty seconds, and the whole call
+at two minutes, because a single engine call cannot be interrupted part-way — and a memory-heavy
+one fails with an error you can read and fix. Kuna fetches the SLEIGH spec for a binary's architecture on demand: a
 program that needs one is run again for you, so read the engine's answer, not a first
 failure.`;
 
@@ -463,7 +475,26 @@ that comes after. What is not shared is attention — a program runs against one
         const params = input as { fileId: string; code: string };
         const entry = await load(conversation, params.fileId);
         if (signal?.aborted) throw new Error("Stopped.");
-        const outcome = await entry.sandbox.run(params.code);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const outcome = await Promise.race([
+          entry.sandbox.run(params.code),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => {
+              // The session cannot survive this, so it is dropped now rather than left cached and
+              // broken: the next program gets a fresh worker and a recompiled engine.
+              loaded.delete(params.fileId);
+              entry.sandbox.cancel();
+              reject(
+                new Error(
+                  `The program was stopped after ${PROGRAM_DEADLINE_MS / 1000} seconds. A single ` +
+                    "engine call cannot be interrupted part-way, so nothing came back — ask for " +
+                    "less at once: one function instead of the whole binary, or a filtered " +
+                    "listing instead of a full one.",
+                ),
+              );
+            }, PROGRAM_DEADLINE_MS);
+          }),
+        ]).finally(() => clearTimeout(timer));
         // The program's output becomes files; until they are stored, nothing else can read them.
         await Promise.all(pendingSaves.splice(0));
         return {
@@ -770,7 +801,23 @@ that comes after. What is not shared is attention — a program runs against one
     });
   };
 
-  const abort = () => activeAgent?.abort();
+  /**
+   * Stops the run, and the programs in it.
+   *
+   * Aborting the agent loop is not enough: a program inside the wasm interpreter is one
+   * synchronous step, so the only way to stop it is to end the worker it lives in — which is what
+   * `cancel` does, and why every session is dropped here rather than left for the next program to
+   * discover.
+   */
+  const abort = () => {
+    activeAgent?.abort();
+    for (const entry of [...loaded.values()]) {
+      void entry
+        .then((session) => session.sandbox.cancel())
+        .catch(() => undefined);
+    }
+    loaded.clear();
+  };
   const disposeConversation = (conversation: Conversation) => {
     for (const line of conversation.lines) {
       if (line.kind !== "file" || !line.storedFileId) continue;
