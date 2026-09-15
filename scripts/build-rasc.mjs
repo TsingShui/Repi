@@ -7,11 +7,10 @@
  *   public/rasc/          the wasm module and the licences. Gitignored — build
  *                         output, and the module is the only artifact the page
  *                         fetches at runtime.
- *   src/vendor/rasc/      the host glue: the five imports the module needs and
- *                         the windowed reader that makes a Blob source fast.
- *                         Committed, because the Worker imports it statically and
- *                         a missing module is a build failure. Refreshing it is
- *                         what this script does.
+ *   src/vendor/rasc/      the reference WASI host, copied from the same checkout.
+ *                         Committed, because the Node-side oracle imports it and a
+ *                         missing module is a build failure. Refreshing it is what
+ *                         this script does.
  *
  * The split is deliberate and the same one `build-kuna.mjs` makes: the parts the
  * bundler must resolve are in the repository, and the parts that are merely
@@ -38,7 +37,14 @@ const skipBuild = process.argv.includes("--skip-build");
 
 const publicDir = join(projectRoot, "public/rasc");
 const vendorDir = join(projectRoot, "src/vendor/rasc");
-const wasmSource = join(rascRepo, "target/wasm32-unknown-unknown/release/rasc.wasm");
+/**
+ * Rasc builds for `wasm32-wasip1`: the engine is a **program**, not a host module. It
+ * takes `argv`, an environment, a directory it was given access to, and it writes
+ * stdout and stderr - the same shape Kuna already has, and the reason neither engine
+ * needs a bespoke host glue here.
+ */
+const TARGET = "wasm32-wasip1";
+const wasmSource = join(rascRepo, `target/${TARGET}/release/rasc.wasm`);
 
 function run(command, args, options = {}) {
   return new Promise((done, fail) => {
@@ -89,8 +95,8 @@ console.log(`>> rasc checkout: ${rascRepo}`);
 if (skipBuild) {
   console.log(">> skipping the wasm build");
 } else {
-  console.log(">> building rasc (wasm32-unknown-unknown, release)");
-  await run("cargo", ["build", "--release", "--target", "wasm32-unknown-unknown"], {
+  console.log(`>> building rasc (${TARGET}, release)`);
+  await run("cargo", ["build", "--release", "--target", TARGET], {
     cwd: rascRepo,
   });
 }
@@ -110,7 +116,11 @@ await cp(wasmSource, join(publicDir, "rasc.wasm"));
 
 await rm(vendorDir, { recursive: true, force: true });
 await mkdir(vendorDir, { recursive: true });
-await cp(join(rascRepo, "js/rasc.mjs"), join(vendorDir, "rasc.mjs"));
+// The reference WASI host: plain JavaScript, no imports, and the only thing that knows how a
+// command line reaches the engine. `src/vendor/rasc/wasi.mjs` is what the Node-side oracle
+// and the checks drive the engine with; the page's own host is the analogous Worker under
+// `src/lib/analysis/rasc/`.
+await cp(join(rascRepo, "js/wasi-run.mjs"), join(vendorDir, "wasi-run.mjs"));
 
 // ------------------------------------------------------------- attribution
 
@@ -129,7 +139,7 @@ Built from a local checkout by \`scripts/build-rasc.mjs\`.
 
 - Source: ${rascRepo}
 - Commit: ${await rascCommit()}
-- Target: wasm32-unknown-unknown, release
+- Target: ${TARGET}, release
 
 Rasc is Apache-2.0; the full text is in \`RASC-LICENSE\` and the attribution in
 \`RASC-NOTICE\`. The vendored host glue in \`src/vendor/rasc/rasc.mjs\` is copied
@@ -141,4 +151,4 @@ from the same commit.
 
 console.log(">> assembled public/rasc/");
 console.log(`   wasm: ${human((await stat(join(publicDir, "rasc.wasm"))).size)}`);
-console.log(`   refreshed src/vendor/rasc/rasc.mjs from ${rascRepo}`);
+console.log(`   refreshed src/vendor/rasc/wasi-run.mjs from ${rascRepo}`);

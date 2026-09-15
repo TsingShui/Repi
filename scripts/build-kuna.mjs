@@ -6,10 +6,12 @@
  *
  *   public/kuna/          the wasm, the SLEIGH tree, the preload bundle, the
  *                         licences. Gitignored — 20 MB of build output.
- *   src/vendor/kuna/      the harness (a Worker, a client and a JS WASI shim).
- *                         Committed, because the page imports it statically and
- *                         a missing module is a build failure. 160 KB, and
- *                         refreshing it is what this script does.
+ *   src/vendor/kuna/      the WASI shim both engines run on, committed as it is.
+ *                         The engine's own JavaScript harness is **not** vendored
+ *                         any more: Kuna is a wasm32-wasip1 program now, so the
+ *                         page mounts it and calls it like any other, and all the
+ *                         harness had that this needs (the spec tree, the lazy
+ *                         `.sla` lookup) lives in `lib/analysis/kuna/kuna-host.ts`.
  *
  * The split is deliberate: the parts the bundler must resolve are in the
  * repository, and the parts that are merely fetched are not. Without a checkout
@@ -31,7 +33,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "..");
 
-const kunaRepo = resolve(process.env.KUNA_REPO ?? join(homedir(), "zhome/kuna"));
+const kunaRepo = resolve(process.env.KUNA_REPO ?? join(homedir(), "kuna"));
 const skipBuild = process.argv.includes("--skip-build");
 
 const publicDir = join(projectRoot, "public/kuna");
@@ -149,20 +151,13 @@ for (const path of runtimeFiles) {
 }
 await writeFile(join(publicDir, "specs-small.json"), JSON.stringify(preload));
 
-// --------------------------------------------------------- vendor refresh
+// --------------------------------------------------------- vendor shim
 
+// Nothing to refresh. The shim under `src/vendor/kuna/vendor/` is the WASI preview1
+// implementation both engines link against, and it is committed: it is a dependency of the
+// page, not an artifact of this build, and re-copying it would make the application's build
+// depend on a checkout it does not otherwise need.
 const web = join(kunaRepo, "integrations/web");
-await rm(vendorDir, { recursive: true, force: true });
-await mkdir(vendorDir, { recursive: true });
-
-for (const file of ["kuna-web.js", "kuna-worker.js", "kuna-worker-client.js", "zip.js"]) {
-  await cp(join(web, file), join(vendorDir, file));
-}
-// `kuna-web.js` imports `./vendor/browser_wasi_shim/dist/index.js`, so the path
-// is kept exactly as it is upstream and the refresh stays a straight copy.
-await cp(join(web, "vendor/browser_wasi_shim"), join(vendorDir, "vendor/browser_wasi_shim"), {
-  recursive: true,
-});
 
 // --------------------------------------------------------------- fixtures
 
@@ -215,4 +210,4 @@ const specBytes = (await walk(join(publicDir, "specs"))).reduce(async (total, pa
 console.log(`   specs: ${human(await specBytes)} across ${runtimeFiles.length} files`);
 const everything = (await walk(publicDir)).reduce(async (total, path) => (await total) + (await stat(path)).size, Promise.resolve(0));
 console.log(`   total served: ${human(await everything)}`);
-console.log(`   refreshed src/vendor/kuna/ from ${relative(repoRoot, web)}`);
+console.log("   src/vendor/kuna/ holds the WASI shim only (nothing to refresh)");

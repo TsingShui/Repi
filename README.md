@@ -13,15 +13,17 @@ What is in the repository today is the part of the old build that survives:
   a separate IndexedDB blob store as the fallback, and the rail's storage meter opens
   a panel that lists what is cached and deletes individual copies;
 - the Pi Agent loop, connected to user-configured OpenAI-compatible providers. It
-  discovers their model catalogs through `/models` and can call bounded, read-only
-  tools over the locally stored binary; only textual tool results enter the model request;
+  writes short JavaScript programs that the sandbox runs beside the engine, so what
+  the model reads is the answer the program returned rather than the engine's output;
+  only that text enters the model request;
 - direct WebUSB ADB connection for a locally attached Android phone: browser-stored
   ADB credentials, Android authorization, device facts and a root-capability probe all
   stay local; Frida sessions are the next layer, not yet wired into the Agent;
 - the file intake (picker, drop, attach, local format detection);
-- the two engines as **analysers** — Kuna for native binaries, Rasc for APK and
-  DEX, both compiled to WebAssembly and run on the device — with their Worker
-  transport and the contract the Agent tools call;
+- the two engines as **programs** — Kuna for native binaries, Rasc for APK and DEX,
+  both `wasm32-wasip1`, both run on the device by one WASI host over a virtual
+  filesystem, and both reached the same way: a command line in, two streams and an
+  exit code out;
 - the About page, which carries the licence list — the engines ship with the page, so
   their terms have to be readable from it;
 - the analysis contract's checks, which run in Node with no browser.
@@ -68,11 +70,26 @@ npm run preview   # serves dist/ on http://127.0.0.1:4173
 
 ## Checks
 
-`npm run check:analysis` runs the analysis contract under Node, without a browser.
-It bundles the checks with Vite and covers the paths that are awkward to reach by
-hand: progressive discovery, abort keeping partial results, a stripped binary, a
-class tree, a list of 120,000, the streaming SHA-256 the readout prints, and the
-ZIP directory read that says APK rather than ZIP when the first bytes cannot.
+`npm run check:detect`, `npm run check:sandbox` and `npm run check:kuna` run under
+Node, without a browser. All three bundle their checks with Vite through
+`scripts/run-analysis-check.mjs`; the last two need built artifacts (`APK=` and
+`npm run build:kuna` respectively) and skip cleanly without them.
+
+`check:detect` covers format detection, which is what picks the engine: an ELF is a
+native binary, an archive is an APK once its central directory says so and a plain
+archive stays an archive.
+
+`check:sandbox` (needs `APK=`) covers the two things the agent runs on: the sandbox
+runs a program, returns what it printed, refuses a runaway loop and an allocation it
+cannot afford, and is usable again after both; and `extract()` pulls one real entry
+out of a real APK — reading only that entry — with the declared size and CRC checked.
+
+`check:kuna` (needs `npm run build:kuna`) drives Kuna's own wasm over the spec tree
+this build assembles, served over HTTP because that is how the page fetches it. It is
+what proves the bridge: the engine names the language it is missing
+(`x86:LE:64:default:gcc`), the host maps that to its `.sla`, fetches it between
+programs, and the same call lists and decompiles on the retry — including from inside
+a sandbox program.
 
 There is no browser-level check at the moment: the smoke suite drove the
 workspace, and the workspace is gone. One belongs with the Agent surface, and the
@@ -99,15 +116,14 @@ src/
   features/about/credits.ts     the credits and the scopes they are grouped by
   lib/detect-format.ts          local format detection, header plus ZIP directory
   lib/storage/                  IndexedDB records and OPFS-backed binary storage
-  lib/agent/                    Pi Agent runtime and local reverse-engineering tools
+  lib/agent/                    the Pi Agent runtime, the code sandbox, and its Worker
   lib/device/                   direct WebUSB ADB adapter; protocol details stay here
   lib/sha256.ts                 streaming digest, so a large file is never held
   lib/pointer.ts                fine or coarse pointer, read once
-  lib/analysis/types.ts         the contract an engine implements
-  lib/analysis/kuna/            the native engine: Worker, WASI shim, adapter
-  lib/analysis/rasc/            the APK/DEX engine: Worker, host glue, adapter
-    driver.ts                   the Worker and the command protocol
-    worker.ts                   byte ranges from a Blob, one run at a time
+  lib/analysis/rasc/wasi.ts     the WASI host: mounts, streams, one program per call
+  lib/analysis/rasc/limits.ts   the tab's memory policy for the engine
+  lib/analysis/kuna/kuna-host.ts the native engine's spec tree and lazy .sla lookup
+  lib/analysis/archive/zip-extract.ts  one entry out of an APK, verified
   lib/analysis/mock-source.ts   deterministic stand-in, used by the checks
 ```
 
@@ -122,7 +138,7 @@ is reachable from the conversation's bar and needs no engine installed.
 Both engines are separate repositories, so their artifacts come from checkouts:
 
 ```bash
-npm run build:kuna                              # reads ~/zhome/kuna
+npm run build:kuna                              # reads ~/kuna
 KUNA_REPO=/path/to/kuna npm run build:kuna      # or say where it is
 
 npm run build:rasc                              # reads ~/rasc

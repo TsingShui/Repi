@@ -10,3 +10,6 @@ public/kuna/
 public/rasc/
 .pi/
 .DS_Store
+
+# Bundled check output (scripts/run-analysis-check.mjs writes here).
+/.cache/

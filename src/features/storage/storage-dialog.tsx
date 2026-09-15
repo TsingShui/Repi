@@ -75,7 +75,16 @@ export function StorageDialog(props: StorageDialogProps) {
   );
 
   const contexts = () => contextsOf(props.files, props.conversations);
-  const cachedBytes = () => props.files.reduce((total, file) => total + file.size, 0);
+  /*
+   * Two kinds of thing live here, and they are not the same kind of thing: a binary someone
+   * dropped in, and a file an engine produced. The second is the sandbox's filesystem — every
+   * conversation can open it — so it is listed by the path a program would use, not by which
+   * attachment it came from.
+   */
+  const attachments = () => props.files.filter((file) => file.origin !== "derived");
+  const derived = () => props.files.filter((file) => file.origin === "derived");
+  const cachedBytes = () => attachments().reduce((total, file) => total + file.size, 0);
+  const derivedBytes = () => derived().reduce((total, file) => total + file.size, 0);
   const close = () => props.onClose();
 
   const remove = async (id: string) => {
@@ -136,8 +145,11 @@ export function StorageDialog(props: StorageDialogProps) {
             {props.usage?.persisted ? "Persistent" : "Best effort"}
           </span>
           <span class="storage-chip">
-            {props.files.length} file{props.files.length === 1 ? "" : "s"}
+            {attachments().length} binar{attachments().length === 1 ? "y" : "ies"}
           </span>
+          <Show when={derived().length > 0}>
+            <span class="storage-chip">{derived().length} in the sandbox</span>
+          </Show>
         </div>
 
         <Show when={props.usage && !props.usage.persisted}>
@@ -155,13 +167,13 @@ export function StorageDialog(props: StorageDialogProps) {
       <section class="storage-files" aria-label="Cached files">
         <div class="storage-files-head">
           <span>Cached binaries</span>
-          <Show when={props.files.length > 0}>
+          <Show when={attachments().length > 0}>
             <span class="storage-files-total">{formatBytes(cachedBytes())}</span>
           </Show>
         </div>
 
         <Show
-          when={props.files.length > 0}
+          when={attachments().length > 0}
           fallback={
             <p class="storage-empty">
               Nothing is stored yet. A binary dropped into a conversation is kept here, on this device.
@@ -169,7 +181,7 @@ export function StorageDialog(props: StorageDialogProps) {
           }
         >
           <ul class="storage-file-list">
-            <For each={props.files}>
+            <For each={attachments()}>
               {(file) => (
                 <li class="storage-file" data-busy={busyId() === file.id ? "true" : "false"}>
                   <span class="storage-file-icon" aria-hidden="true">
@@ -198,6 +210,61 @@ export function StorageDialog(props: StorageDialogProps) {
                     class="storage-file-delete"
                     aria-label={`Delete ${file.name} from this browser`}
                     title="Delete this local copy"
+                    disabled={busyId() !== null}
+                    onClick={() => void remove(file.id)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" />
+                    </svg>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+      </section>
+
+      <section class="storage-files" aria-label="Sandbox files">
+        <div class="storage-files-head">
+          <span>In the sandbox</span>
+          <Show when={derived().length > 0}>
+            <span class="storage-files-total">{formatBytes(derivedBytes())}</span>
+          </Show>
+        </div>
+        <Show
+          when={derived().length > 0}
+          fallback={
+            <p class="storage-empty">
+              Nothing yet. A file an engine produces — an entry pulled out of an archive, a
+              decompiler’s output — lands here, and every conversation can read it.
+            </p>
+          }
+        >
+          <ul class="storage-file-list">
+            <For each={derived()}>
+              {(file) => (
+                <li class="storage-file" data-busy={busyId() === file.id ? "true" : "false"}>
+                  <span class="storage-file-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M6 3h8l4 4v14H6z" />
+                      <path d="M14 3v4h4" />
+                    </svg>
+                  </span>
+                  <span class="storage-file-copy">
+                    <span class="storage-file-name" title={file.path ?? file.name}>
+                      {file.path ?? file.name}
+                    </span>
+                    <span class="storage-file-facts">
+                      {formatBytes(file.size)}
+                      {" · "}
+                      {shortDate(file.createdAt)}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    class="storage-file-delete"
+                    aria-label={`Delete ${file.path ?? file.name} from the sandbox`}
+                    title="Delete this file from the sandbox"
                     disabled={busyId() !== null}
                     onClick={() => void remove(file.id)}
                   >

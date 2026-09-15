@@ -20,6 +20,18 @@ export interface StoredFile {
   readonly lastModified: number;
   readonly createdAt: number;
   readonly backend: "opfs" | "indexeddb";
+  /**
+   * What the file is to the sandbox.
+   *
+   * An `attachment` is something the user handed over: it is mounted read-only, and no program
+   * can write to it or delete it. A `derived` file is something an engine or a program
+   * produced — an entry pulled out of an archive, a decompiler's output — and it lives in the
+   * virtual filesystem every conversation can read, which is why it is addressable by `path`
+   * rather than by which conversation happened to make it.
+   */
+  readonly origin?: "attachment" | "derived";
+  /** Where the sandbox sees a derived file, e.g. `/work/libfoo.so`. */
+  readonly path?: string;
 }
 
 export interface StorageUsage {
@@ -263,9 +275,9 @@ export function createWorkspaceStorage() {
     await completed;
   };
 
-  const saveFile = async (
-    conversationId: string,
+  const writeFile = async (
     file: File,
+    extras: { conversationId: string; origin?: "attachment" | "derived"; path?: string },
     onProgress?: (written: number) => void,
   ): Promise<StoredFile> => {
     const estimate = await navigator.storage?.estimate?.();
@@ -280,12 +292,14 @@ export function createWorkspaceStorage() {
     const id = makeId();
     const common = {
       id,
-      conversationId,
+      conversationId: extras.conversationId,
       name: file.name,
       type: file.type,
       size: file.size,
       lastModified: file.lastModified,
       createdAt: Date.now(),
+      ...(extras.origin ? { origin: extras.origin } : {}),
+      ...(extras.path ? { path: extras.path } : {}),
     } as const;
 
     let record: FileRecord;
@@ -328,6 +342,31 @@ export function createWorkspaceStorage() {
       if (record.backend === "opfs") await removeOpfsFile(id).catch(() => undefined);
       throw error;
     }
+  };
+
+  /**
+   * Stores derived bytes under a path, replacing whatever was there.
+   *
+   * Replacement is by path, not by id: a program that extracts the same library twice means
+   * one file in the sandbox, so an earlier copy is dropped rather than piled up beside it.
+   */
+  const saveDerived = async (
+    path: string,
+    bytes: Uint8Array,
+    conversationId: string,
+  ): Promise<StoredFile> => {
+    const name = path.split("/").filter(Boolean).pop() ?? path;
+    const existing = await listDerived();
+    for (const record of existing) {
+      if (record.path === path) await deleteFile(record.id);
+    }
+    const file = new File([bytes as BlobPart], name, { type: "application/octet-stream" });
+    return writeFile(file, { conversationId, origin: "derived", path });
+  };
+
+  /** Everything the sandbox can see beyond the attachment: the shared, derived files. */
+  const listDerived = async (): Promise<readonly StoredFile[]> => {
+    return (await listFiles()).filter((record) => record.origin === "derived");
   };
 
   const listFiles = async (): Promise<readonly StoredFile[]> => {
@@ -502,7 +541,10 @@ export function createWorkspaceStorage() {
   return {
     listConversations,
     putConversation,
-    saveFile,
+    saveFile: (conversationId: string, file: File, onProgress?: (written: number) => void) =>
+      writeFile(file, { conversationId, origin: "attachment" }, onProgress),
+    saveDerived,
+    listDerived,
     listFiles,
     openFile,
     deleteFile,

@@ -7,8 +7,10 @@ Run these from the repository root. Nothing here needs the network except
 | --- | --- |
 | `npm run dev` | Development server. |
 | `npm run build` | `tsc --noEmit`, a Vite build, then the licence is copied into `dist/`. |
-| `npm run check:analysis` | The analysis contract, in Node, without a browser. |
-| `npm run build:kuna` | Builds the native decompiler from a checkout (`KUNA_REPO`, default `~/zhome/kuna`). |
+| `npm run check:detect` | Format detection, in Node, without a browser.
+| `npm run check:sandbox` | The code sandbox and the extractor (needs `APK=`).
+| `npm run check:kuna` | Kuna through the WASI host: the lazy `.sla` loop (needs `npm run build:kuna`). |
+| `npm run build:kuna` | Builds the native decompiler from a checkout (`KUNA_REPO`, default `~/kuna`). |
 | `npm run build:rasc` | Builds the APK/DEX decompiler from a checkout (`RASC_REPO`, default `~/rasc`). |
 
 Deploying is manual and only manual: `.github/workflows/deploy.yml` has no push

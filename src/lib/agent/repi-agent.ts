@@ -10,16 +10,34 @@ import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
 import type { Conversation } from "../../features/chat/types";
 import { loadPiProvider } from "../../features/models/pi-providers";
 import { modelKey, type ModelProvider } from "../../features/models/types";
-import { chooseSource } from "../analysis/choose-source";
-import type { AnalysisSource, UnitAnalysis } from "../analysis/types";
-import { formatAddress } from "../analysis/types";
-import { detectFormat } from "../detect-format";
+import { artifactAvailable, artifactUrl } from "../analysis/engine-artifacts";
+import { ARCHIVE_PATH } from "../analysis/rasc/wasi";
+import { ENGINE_WASM } from "./sandbox";
+import { detectFormat, type FormatMatch } from "../detect-format";
+import { openSandbox, type SandboxSession } from "./sandbox";
+import type { SandboxOutcome } from "./quickjs-sandbox";
 
 const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a browser.
-Use the provided read-only tools to inspect the user's attached binaries before making claims about them.
-The binary itself stays on the user's device. Tool results contain only bounded text selected from local analysis.
-Never claim that you inspected bytes, functions, strings, or code unless a tool returned that information.
-Be concise, cite function names and addresses when useful, and say clearly when an analyser is unavailable.`;
+
+You inspect the user's attached binary by writing short JavaScript programs with run_js. The
+program runs on the user's device, beside the analyser, and only what it prints or returns
+comes back to you — the binary never leaves the machine and never enters this conversation.
+
+Write a program when you want to know something. The analyser's own output is large (a class
+list from a real APK is around 20 MB, and a string table is bigger), so filter with the
+engine's flags first (--filter, --limit, --offset), compute in the program, and return a
+small answer: a count, a few rows, a summary. A program that returns a whole table is a
+program that told you nothing.
+
+An APK has two layers and you can look at both in one program: rasc reads the DEX side (its
+class list, its strings, its manifest, a decompiled class), extract() pulls a native library
+out of the archive, and Kuna reads that library. Ask for whichever you need — nothing has to
+be decided up front.
+
+Never claim to have inspected bytes, functions, strings or code that no tool returned. When
+an analyser is not installed for a file, say so. Be concise, cite class and function names
+where they are useful, and prefer one program that answers the question over many that
+print raw output.`;
 
 export interface AgentRunCallbacks {
   readonly onText: (text: string) => void;
@@ -32,14 +50,20 @@ export interface AgentRunResult {
   readonly error: string | null;
 }
 
-interface AnalysedFile {
-  readonly file: File;
-  readonly source: AnalysisSource;
-  readonly scanned: Set<string>;
-}
+/** How small a file cannot be a real engine wasm. */
+const MIN_ENGINE_BYTES = 500_000;
 
 export interface RepiAgentRuntimeOptions {
   readonly openFile: (id: string) => Promise<File>;
+  /**
+   * The shared virtual filesystem: what earlier sessions produced, and where a program's
+   * output goes. The agent does not know what a store is — it hands bytes over and asks for
+   * what is there — which is what keeps the sandbox testable without a browser.
+   */
+  readonly vfs: {
+    list(): Promise<readonly { readonly path: string; readonly bytes: Uint8Array }[]>;
+    save(path: string, bytes: Uint8Array, conversationId: string): Promise<void>;
+  };
 }
 
 function selectedProvider(
@@ -71,76 +95,147 @@ function seedMessages(conversation: Conversation): AgentMessage[] {
   });
 }
 
-function boundedLimit(value: number | undefined, fallback: number, maximum: number): number {
-  if (value === undefined || !Number.isFinite(value)) return fallback;
-  return Math.max(1, Math.min(maximum, Math.floor(value)));
-}
-
+/** A tool result is text; this is the one place that turns a value into it, bounded. */
 function toolText(value: unknown): string {
-  const text = JSON.stringify(value);
+  const text = typeof value === "string" ? value : JSON.stringify(value);
   const limit = 80_000;
   return text.length <= limit ? text : `${text.slice(0, limit)}\n[tool result truncated]`;
+}
+
+interface Loaded {
+  readonly file: File;
+  readonly format: FormatMatch;
+  readonly sandbox: SandboxSession;
+}
+
+/** What the model is told before it writes its first program. */
+const RUN_JS_DESCRIPTION = `Run a short JavaScript program against the attached binary, locally.
+
+These are the tools, and you may call any of them: **rasc** (APK/DEX), **Kuna** (native
+binaries), **extract** (one entry out of an archive), **tools** (what is loaded). One may
+have to be fetched before it can run; when that happens the host loads it and runs your
+program again, so read the answer, not a first failure. In scope:
+
+  rasc(args)     runs the engine and returns { stdout, stderr, code }. args is its command
+                 line — the attached archive is mounted at "${ARCHIVE_PATH}". Kuna takes its
+                 commands as a function that reads files already mounted. Examples:
+                   rasc(['manifest', "${ARCHIVE_PATH}"])
+                   rasc(['classes', '--filter', 'Activity', "${ARCHIVE_PATH}"])
+                   rasc(['strings', '--limit', '50', '--filter', 'http', "${ARCHIVE_PATH}"])
+                   rasc(['getclass', "${ARCHIVE_PATH}", 'com.example.MainActivity'])
+                   extract('/lib/arm64-v8a/libfoo.so')      // { path, bytes }
+                   kuna([binaryPath, 'list'])               // functions, with addresses
+                   kuna([binaryPath, 'decompile', 'JNI_OnLoad'])
+  extract(path)  pulls one entry out of the archive and mounts it, returning the path to use
+                 afterwards — this is how a native library inside an APK reaches Kuna.
+  tools()        what this sandbox can do: each tool, and whether it is loaded yet.
+  print(value)   adds a line to what you receive. The last expression's value (or a returned
+                 value) is returned to you as well.
+
+There is no network, no filesystem and no import: nothing else is reachable.
+
+Filter in the engine, not after it. Its output is tens of megabytes on a real APK, one call
+re-walks the archive in a few hundred milliseconds, and everything you print comes back to
+you. Prefer a few well-argued calls over many, and return counts and samples rather than
+tables. A long-running program is interrupted and a memory-heavy one fails with an error you
+can read and fix. Kuna fetches the SLEIGH spec for a binary's architecture on demand: a
+program that needs one is run again for you, so read the engine's answer, not a first
+failure.`;
+
+/** Renders one program's outcome as the text the model reads. */
+function renderOutcome(entry: Loaded, outcome: SandboxOutcome): string {
+  const parts: string[] = [];
+  if (outcome.result !== null && outcome.result.length > 0) parts.push(`result:
+${outcome.result}`);
+  if (outcome.printed.length > 0) parts.push(`printed:
+${outcome.printed}`);
+  if (outcome.error) {
+    const where = outcome.error.stack ? `
+${outcome.error.stack.split("\n").slice(0, 3).join("\n")}` : "";
+    parts.push(`error: ${outcome.error.name}: ${outcome.error.message}${where}`);
+  }
+  parts.push(
+    `[${entry.format.label}: ${outcome.calls} engine call(s), ${outcome.ms} ms` +
+      `${outcome.truncated ? ", output truncated" : ""}]`,
+  );
+  return parts.join("\n\n");
 }
 
 /**
  * Browser-hosted Pi agent runtime.
  *
- * Pi owns the model/tool loop. This adapter owns the browser-specific tools and
- * keeps File/Blob objects behind the local analysis seam; only bounded text tool
- * results can reach the provider.
+ * Pi owns the model/tool loop. This adapter owns the sandbox the model writes programs into
+ * and keeps `File` objects behind the local seam; only the text a program prints or returns
+ * can reach the provider.
  */
 export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
-  const analysed = new Map<string, Promise<AnalysedFile>>();
+  const loaded = new Map<string, Promise<Loaded>>();
   let activeAgent: Agent | null = null;
 
   const fileLine = (conversation: Conversation, fileId: string) =>
-    conversation.lines.find(
-      (line) => line.kind === "file" && line.storedFileId === fileId,
-    );
+    conversation.lines.find((line) => line.kind === "file" && line.storedFileId === fileId);
 
-  const stopAnalysis = (entry: AnalysedFile) => entry.source.stop();
-
-  const load = async (conversation: Conversation, fileId: string): Promise<AnalysedFile> => {
-    const known = analysed.get(fileId);
+  /**
+   * Opens the engine for one attached binary, once per conversation.
+   *
+   * The sandbox is bound to one archive for its life, which is what makes `rasc(args)` a
+   * function call rather than a protocol: the program names the mount, and the bytes are
+   * already there.
+   */
+  const load = (conversation: Conversation, fileId: string): Promise<Loaded> => {
+    const known = loaded.get(fileId);
     if (known) return known;
 
     const task = (async () => {
       const line = fileLine(conversation, fileId);
       if (!line || line.kind !== "file") throw new Error("That binary is not attached to this conversation.");
-      if (line.engine === null) throw new Error(`No local analyser supports ${line.format}.`);
-
       const file = await options.openFile(fileId);
       const format = await detectFormat(file);
-      const chosen = await chooseSource(file, format);
-      if (!chosen.source) throw new Error(chosen.unavailable ?? "No local analyser is available for this file.");
-      return { file, source: chosen.source, scanned: new Set<string>() };
-    })();
-    analysed.set(fileId, task);
-    task.catch(() => analysed.delete(fileId));
-    return task;
-  };
 
-  const unit = async (
-    conversation: Conversation,
-    fileId: string,
-    unitId?: string,
-    signal?: AbortSignal,
-  ): Promise<UnitAnalysis> => {
-    const entry = await load(conversation, fileId);
-    const id = unitId ?? entry.source.primaryUnitId;
-    const analysis = entry.source.unit(id);
-    if (!entry.scanned.has(id)) {
-      const stop = () => stopAnalysis(entry);
-      signal?.addEventListener("abort", stop, { once: true });
-      try {
-        const outcome = await analysis.scan(() => undefined);
-        if (outcome !== "ready") throw new Error(`Analysis ended with status: ${outcome}.`);
-        entry.scanned.add(id);
-      } finally {
-        signal?.removeEventListener("abort", stop);
+      /*
+       * What the sandbox can do is what this deployment has installed, not what the file's
+       * format implies. An APK is rasc plus Kuna the moment a program extracts a native
+       * library from it, and a deployment that built only one engine still gives the other
+       * name an answer ("not installed in this build") instead of refusing the file.
+       */
+      const installed: ("rasc" | "kuna")[] = [];
+      for (const name of ["rasc", "kuna"] as const) {
+        if (await artifactAvailable(ENGINE_WASM[name], MIN_ENGINE_BYTES)) installed.push(name);
       }
-    }
-    return analysis;
+      const warm = format.engine !== null && installed.includes(format.engine) ? format.engine : undefined;
+      if (installed.length === 0) {
+        throw new Error(
+          `No analyser is installed in this build, so ${format.label} cannot be analysed. ` +
+            "Run `npm run build:rasc` or `npm run build:kuna`, then reload.",
+        );
+      }
+      const vfs = await options.vfs.list().catch(() => []);
+      return {
+        file,
+        format,
+        sandbox: openSandbox(file, {
+          ...(vfs.length > 0 ? { vfs } : {}),
+          // A program's output is persisted where every conversation can see it: the point of
+          // the sandbox having a filesystem rather than a scratch copy of one.
+          onProduced: (files) => {
+            for (const produced of files) {
+              void options.vfs.save(produced.path, produced.bytes, conversation.id).catch(() => undefined);
+            }
+          },
+          engines: installed,
+          ...(warm ? { warm } : {}),
+          ...(installed.includes("kuna")
+            ? {
+                specRoot: artifactUrl("kuna", "specs"),
+                smallBundleUrl: artifactUrl("kuna", "specs-small.json"),
+              }
+            : {}),
+        }),
+      };
+    })();
+    loaded.set(fileId, task);
+    task.catch(() => loaded.delete(fileId));
+    return task;
   };
 
   const toolsFor = (conversation: Conversation): AgentTool[] => [
@@ -168,133 +263,22 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
       },
     },
     {
-      name: "inspect_binary",
-      label: "Inspect binary",
-      description:
-        "Run the local analyser and return bounded metadata plus samples of functions, classes, sections, imports and exports.",
+      name: "run_js",
+      label: "Run JavaScript",
+      description: RUN_JS_DESCRIPTION,
       parameters: Type.Object({
         fileId: Type.String({ description: "Local file ID from list_binaries" }),
-        unitId: Type.Optional(Type.String({ description: "Unit ID; omit for the primary unit" })),
+        code: Type.String({ description: "The JavaScript program to run in the sandbox" }),
       }),
       async execute(_toolCallId, input, signal) {
-        const params = input as { fileId: string; unitId?: string };
+        const params = input as { fileId: string; code: string };
         const entry = await load(conversation, params.fileId);
-        const target = await unit(conversation, params.fileId, params.unitId, signal);
-        const limit = 40;
-        const facts = target.facts();
-        const result = {
-          file: entry.file.name,
-          units: entry.source.units,
-          activeUnit: target.unit,
-          capabilities: target.capabilities,
-          facts,
-          functionCount: target.functions().length,
-          functions: target.functions().slice(0, limit).map((fn) => ({
-            id: fn.id,
-            name: fn.name,
-            address: formatAddress(fn.address),
-            size: fn.size,
-          })),
-          classCount: target.classes().length,
-          classes: target.classes().slice(0, limit).map((item) => ({
-            id: item.id,
-            name: item.qualifiedName,
-          })),
-          stringCount: target.stringTotal?.() ?? target.strings().length,
-          sections: target.sections().slice(0, limit),
-          imports: target.imports().slice(0, limit),
-          exports: target.exports().slice(0, limit),
-          truncated:
-            target.functions().length > limit ||
-            target.classes().length > limit ||
-            target.sections().length > limit ||
-            target.imports().length > limit ||
-            target.exports().length > limit,
+        if (signal?.aborted) throw new Error("Stopped.");
+        const outcome = await entry.sandbox.run(params.code);
+        return {
+          content: [{ type: "text", text: toolText(renderOutcome(entry, outcome)) }],
+          details: outcome,
         };
-        return { content: [{ type: "text", text: toolText(result) }], details: result };
-      },
-    },
-    {
-      name: "find_symbols",
-      label: "Find symbols",
-      description: "Find locally analysed functions or classes by a case-insensitive name fragment.",
-      parameters: Type.Object({
-        fileId: Type.String({ description: "Local file ID from list_binaries" }),
-        query: Type.String({ description: "Name fragment" }),
-        unitId: Type.Optional(Type.String()),
-        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
-      }),
-      async execute(_toolCallId, input, signal) {
-        const params = input as { fileId: string; query: string; unitId?: string; limit?: number };
-        const target = await unit(conversation, params.fileId, params.unitId, signal);
-        const query = params.query.toLocaleLowerCase();
-        const limit = boundedLimit(params.limit, 30, 100);
-        const functions = target.functions()
-          .filter((fn) => fn.name.toLocaleLowerCase().includes(query))
-          .slice(0, limit)
-          .map((fn) => ({ id: fn.id, name: fn.name, address: formatAddress(fn.address), size: fn.size }));
-        const classes = target.classes()
-          .filter((item) => item.qualifiedName.toLocaleLowerCase().includes(query))
-          .slice(0, limit)
-          .map((item) => ({ id: item.id, name: item.qualifiedName }));
-        const result = { functions, classes };
-        return { content: [{ type: "text", text: toolText(result) }], details: result };
-      },
-    },
-    {
-      name: "search_strings",
-      label: "Search strings",
-      description: "Search strings in a binary locally. Returns at most 100 matches.",
-      parameters: Type.Object({
-        fileId: Type.String({ description: "Local file ID from list_binaries" }),
-        query: Type.String({ description: "Case-insensitive substring" }),
-        unitId: Type.Optional(Type.String()),
-        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
-      }),
-      async execute(_toolCallId, input, signal) {
-        const params = input as { fileId: string; query: string; unitId?: string; limit?: number };
-        const target = await unit(conversation, params.fileId, params.unitId, signal);
-        const limit = boundedLimit(params.limit, 30, 100);
-        const results = target.searchStrings
-          ? await target.searchStrings(params.query, limit)
-          : target.strings()
-              .filter((entry) => entry.value.toLocaleLowerCase().includes(params.query.toLocaleLowerCase()))
-              .slice(0, limit);
-        const output = results.map((entry) => ({
-          id: entry.id,
-          address: formatAddress(entry.address),
-          value: entry.value,
-          xrefs: entry.xrefs,
-          functionId: entry.functionId,
-        }));
-        return { content: [{ type: "text", text: toolText({ strings: output }) }], details: output };
-      },
-    },
-    {
-      name: "decompile",
-      label: "Decompile",
-      description: "Decompile one function or class locally using an ID returned by another tool.",
-      parameters: Type.Object({
-        fileId: Type.String({ description: "Local file ID from list_binaries" }),
-        functionId: Type.String({ description: "Function or class ID returned by inspect_binary/find_symbols" }),
-        unitId: Type.Optional(Type.String()),
-      }),
-      async execute(_toolCallId, input, signal) {
-        const params = input as { fileId: string; functionId: string; unitId?: string };
-        const target = await unit(conversation, params.fileId, params.unitId, signal);
-        const code = await target.decompile(params.functionId);
-        const maxLines = 500;
-        const text = code.lines
-          .slice(0, maxLines)
-          .map((line) => `${formatAddress(line.address)}  ${line.text}`)
-          .join("\n");
-        const result = {
-          functionId: code.functionId,
-          language: code.language,
-          code: text,
-          truncated: code.lines.length > maxLines,
-        };
-        return { content: [{ type: "text", text: toolText(result) }], details: result };
       },
     },
   ];
@@ -421,8 +405,8 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
   const disposeConversation = (conversation: Conversation) => {
     for (const line of conversation.lines) {
       if (line.kind !== "file" || !line.storedFileId) continue;
-      void analysed.get(line.storedFileId)?.then(stopAnalysis);
-      analysed.delete(line.storedFileId);
+      void loaded.get(line.storedFileId)?.then((entry) => entry.sandbox.close());
+      loaded.delete(line.storedFileId);
     }
   };
 

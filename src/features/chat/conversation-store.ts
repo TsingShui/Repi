@@ -365,6 +365,31 @@ export function createConversationStore() {
     removeAllFiles,
     keepStorage,
     openFile: storage.openFile,
+
+    /**
+     * The shared virtual filesystem, as bytes.
+     *
+     * Read through the store because it owns the storage: the sandbox asks for what earlier
+     * sessions produced, and gets contents rather than handles — a `File` from one storage
+     * backend is not something a Worker can be handed portably.
+     */
+    listVirtualFiles: async (): Promise<readonly { path: string; bytes: Uint8Array }[]> => {
+      const derived = await storage.listDerived();
+      const loaded = await Promise.all(
+        derived
+          .filter((record): record is typeof record & { path: string } => record.path !== undefined)
+          .map(async (record) => {
+            const file = await storage.openFile(record.id);
+            return { path: record.path, bytes: new Uint8Array(await file.arrayBuffer()) };
+          }),
+      );
+      return loaded;
+    },
+    /** Keeps a file a program produced, under the path the sandbox knows it by. */
+    saveVirtualFile: async (path: string, bytes: Uint8Array, conversationId: string) => {
+      await storage.saveDerived(path, bytes, conversationId);
+      await refreshUsage();
+    },
     refreshStorage,
     whenReady: () => initialization,
   };

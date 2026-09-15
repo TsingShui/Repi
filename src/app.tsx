@@ -1,4 +1,4 @@
-import { createSignal, Match, onCleanup, Show, Switch } from "solid-js";
+import { createSignal, lazy, Match, onCleanup, Show, Switch } from "solid-js";
 import { createFinePointer } from "./lib/pointer";
 import { detectFormat } from "./lib/detect-format";
 import { createRepiAgentRuntime } from "./lib/agent/repi-agent";
@@ -24,7 +24,24 @@ function route(): "about" | null {
   return window.location.hash.replace(/^#\/?/, "") === "about" ? "about" : null;
 }
 
+/**
+ * `?probe` is a development-only screen for the one path a Node check cannot reach: a module
+ * Worker, `FileReaderSync` over a real file, and `fetch` for the engine and its specs. It is
+ * created through `lazy()` inside the guard, so a production bundle has none of it.
+ */
 export function App() {
+  const probing =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).has("probe");
+  if (probing) {
+    const ProbeScreen = lazy(() =>
+      import("./features/probe/probe-screen").then((module) => ({ default: module.ProbeScreen })),
+    );
+    return <ProbeScreen />;
+  }
+  return <MainApp />;
+}
+
+function MainApp() {
   const [page, setPage] = createSignal(route());
   const [dragging, setDragging] = createSignal(false);
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
@@ -38,7 +55,14 @@ export function App() {
   const conversations = createConversationStore();
   const models = createModelStore();
   const devices = createDeviceStore();
-  const agentRuntime = createRepiAgentRuntime({ openFile: conversations.openFile });
+  const agentRuntime = createRepiAgentRuntime({
+    openFile: conversations.openFile,
+    vfs: {
+      list: () => conversations.listVirtualFiles(),
+      save: (path, bytes, conversationId) =>
+        conversations.saveVirtualFile(path, bytes, conversationId),
+    },
+  });
   const finePointer = createFinePointer();
 
   const onHashChange = () => {

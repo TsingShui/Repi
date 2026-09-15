@@ -1,19 +1,30 @@
 /**
- * Bundles `analysis-check.ts` for Node and runs it.
+ * Bundles one check file for Node and runs it.
+ *
+ *   node scripts/run-analysis-check.mjs                 # analysis-check (default)
+ *   node scripts/run-analysis-check.mjs sandbox-check   # the sandbox and the extractor
  *
  * The checks are written in TypeScript against the app's own modules, so they go
  * through Vite once to resolve those imports, then run as a plain ESM file. No
  * browser and no test framework are involved.
  */
-import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { build } from "vite";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
-const outDir = await mkdtemp(join(tmpdir(), "repi-analysis-check-"));
+const entry = process.argv[2] ?? "analysis-check";
+/*
+ * Inside the project, not in the system temp directory: the bundle keeps its imports
+ * external, so `node_modules` has to be reachable from where it lands — and a dependency
+ * that carries a `.wasm` beside its glue (the interpreter does) needs its real path, which a
+ * copy into `/tmp` would break.
+ */
+const outDir = join(projectRoot, ".cache", "checks", entry);
+await rm(outDir, { recursive: true, force: true });
+await mkdir(outDir, { recursive: true });
 
 /*
  * A guard on the source, because the test that would catch this properly needs a
@@ -35,6 +46,13 @@ const outDir = await mkdtemp(join(tmpdir(), "repi-analysis-check-"));
 
   const offenders = [];
   for (const driver of drivers) {
+    // Not every directory under lib/analysis is an engine: the archive helpers live there
+    // too, and a missing driver.ts is simply not this guard's business.
+    const exists = await stat(driver).then(
+      () => true,
+      () => false,
+    );
+    if (!exists) continue;
     const source = await readFile(driver, "utf8");
     for (const match of source.matchAll(/["'`]\/(kuna|rasc)\//g)) {
       offenders.push(`${driver.replace(`${projectRoot}/`, "")}: ${match[0]}`);
@@ -59,13 +77,16 @@ try {
       outDir,
       emptyOutDir: false,
       rollupOptions: {
-        input: resolve(here, "analysis-check.ts"),
-        output: { entryFileNames: "analysis-check.mjs", format: "es" },
+        input: resolve(here, `${entry}.ts`),
+        output: { entryFileNames: `${entry}.mjs`, format: "es" },
       },
     },
   });
 
-  await import(pathToFileURL(join(outDir, "analysis-check.mjs")).href);
+  // The bundle runs from `.cache/checks/<entry>/`, so a check cannot find the project by
+  // walking up from `import.meta.url`; it is handed over instead.
+  process.env.REPI_ROOT = projectRoot;
+  await import(pathToFileURL(join(outDir, `${entry}.mjs`)).href);
 } finally {
   await rm(outDir, { recursive: true, force: true }).catch(() => {});
 }
