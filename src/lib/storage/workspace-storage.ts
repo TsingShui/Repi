@@ -68,6 +68,17 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
+/**
+ * Opens the workspace database, tolerating one a newer build has already upgraded.
+ *
+ * IndexedDB refuses an `open` whose version is lower than the one on disk, with a
+ * `VersionError` that would otherwise fail every read: a tab left open across a
+ * deployment, an older build running beside a newer one on the same origin, or a
+ * browser restoring last week's cached bundle. There is nothing to migrate downwards
+ * — a newer version's stores are extra, not different — so the way back in is to ask
+ * for no version at all, which returns whatever is there. Asking for a version first
+ * is still what creates and upgrades a database this build owns.
+ */
 async function openDatabase(): Promise<IDBDatabase> {
   const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
   request.addEventListener("upgradeneeded", () => {
@@ -86,7 +97,12 @@ async function openDatabase(): Promise<IDBDatabase> {
       database.createObjectStore(FILE_BLOBS, { keyPath: "id" });
     }
   });
-  return requestResult(request);
+  try {
+    return await requestResult(request);
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "VersionError") throw error;
+    return await requestResult(indexedDB.open(DATABASE_NAME));
+  }
 }
 
 /**
