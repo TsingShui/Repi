@@ -16,6 +16,8 @@ import { ENGINE_WASM } from "./sandbox";
 import { detectFormat, type FormatMatch } from "../detect-format";
 import { openSandbox, type SandboxSession } from "./sandbox";
 import type { SandboxOutcome } from "./quickjs-sandbox";
+import { deviceParagraph, deviceTools } from "./device-tools";
+import type { DeviceBridge } from "./device-bridge";
 
 const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a browser.
 
@@ -64,6 +66,14 @@ export interface RepiAgentRuntimeOptions {
     list(): Promise<readonly { readonly path: string; readonly bytes: Uint8Array }[]>;
     save(path: string, bytes: Uint8Array, conversationId: string): Promise<void>;
   };
+  /**
+   * The Android device, when one is attached. Absent in a build without WebUSB.
+   *
+   * A device is the one input that is not a file: it is a live, user-authorized, revocable
+   * link to a phone, and its commands are asynchronous, so it is a tool surface of its own
+   * rather than a function inside the sandbox.
+   */
+  readonly device?: DeviceBridge;
 }
 
 function selectedProvider(
@@ -239,6 +249,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
   };
 
   const toolsFor = (conversation: Conversation): AgentTool[] => [
+    ...deviceTools(options, conversation.id),
     {
       name: "list_binaries",
       label: "List binaries",
@@ -337,7 +348,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     const visibleText = () => [completedText, currentText].filter(Boolean).join("\n\n");
     const agent = new Agent({
       initialState: {
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: SYSTEM_PROMPT + deviceParagraph(options.device?.describe() ?? null),
         model,
         thinkingLevel: "off",
         tools: toolsFor(conversation),

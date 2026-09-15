@@ -14,7 +14,8 @@
     "check:sandbox": "node ./scripts/run-analysis-check.mjs sandbox-check",
     "check:detect": "node ./scripts/run-analysis-check.mjs detect-check",
     "check:kuna": "node ./scripts/run-analysis-check.mjs kuna-check",
-    "check:device": "node ./scripts/device-check.mjs"
+    "check:device": "node ./scripts/device-check.mjs",
+    "check:device-tools": "node ./scripts/run-analysis-check.mjs device-tools-check"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",
@@ -24,6 +25,7 @@
     "@yume-chan/adb": "2.6.4",
     "@yume-chan/adb-credential-web": "2.1.0",
     "@yume-chan/adb-daemon-webusb": "2.3.2",
+    "@yume-chan/stream-extra": "^2.6.0",
     "fflate": "^0.8.3",
     "highlight.js": "11.11.1",
     "markdown-it": "14.3.2",

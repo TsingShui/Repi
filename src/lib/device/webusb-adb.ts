@@ -1,4 +1,7 @@
 import { Adb, AdbDaemonTransport } from "@yume-chan/adb";
+// The sync service takes this package's `ReadableStream`, which is the platform one with
+// statics: `from` is how a byte array becomes a stream the pusher can pipe.
+import { ReadableStream as AdbReadableStream } from "@yume-chan/stream-extra";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import {
   AdbDaemonWebUsbDevice,
@@ -26,10 +29,49 @@ export interface AndroidDeviceInfo {
   readonly root: RootAccess;
 }
 
+/** What one command on the device said. */
+export interface AndroidShellResult {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly code: number;
+  /** A cap was reached, so the text is a prefix and the command may still have been running. */
+  readonly truncated: boolean;
+  /** The command was still running when its time was up and was killed. */
+  readonly timedOut: boolean;
+}
+
+/**
+ * How much of a command's output is kept.
+ *
+ * A shell is the one interface where the device, not the host, decides how much text comes
+ * back: `pm list packages` is a few KB, `cat` on a partition is megabytes, and a command that
+ * loops forever is unbounded. The cap is the host's answer — it keeps reading until this much
+ * and then stops, rather than trusting the command to be reasonable.
+ */
+const SHELL_OUTPUT_LIMIT = 256 << 10;
+/** A command that has not finished by now is killed; the device is not the host's to block. */
+const SHELL_TIMEOUT_MS = 120_000;
+/** The largest file the sync service is allowed to move in one call. */
+const FILE_LIMIT = 512 << 20;
+
 /** A live ADB session. Call close rather than reaching into Tango's transport. */
 export interface AndroidDeviceConnection {
   readonly info: AndroidDeviceInfo;
   readonly disconnected: Promise<void>;
+  /**
+   * Runs one command and waits for it.
+   *
+   * `input` is written to the command's stdin and then closed, which is what makes programs
+   * that read a script from stdin usable — Frida's injector is the reason this exists: it
+   * takes its script as `-s -`, so a script never has to be written to the device's disk.
+   * The legacy (non-shell-protocol) transport has no stdin and no exit code, and says so by
+   * reporting 0 for a command whose output arrived.
+   */
+  shell(command: string, options?: { readonly input?: string }): Promise<AndroidShellResult>;
+  /** Reads one file off the device through the sync service. */
+  pull(remote: string): Promise<Uint8Array>;
+  /** Writes one file to the device through the sync service. */
+  push(remote: string, bytes: Uint8Array, permission?: number): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -64,6 +106,99 @@ function candidate(device: AdbDaemonWebUsbDevice, index: number): AndroidUsbDevi
     name: named ? product : "Android device",
     serial,
   };
+}
+
+/** Reads a stream to its end, stopping at `limit` bytes. */
+async function collect(
+  stream: ReadableStream<Uint8Array>,
+  limit: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let truncated = false;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (total + value.byteLength > limit) {
+      chunks.push(value.subarray(0, limit - total));
+      total = limit;
+      truncated = true;
+      await reader.cancel().catch(() => undefined);
+      break;
+    }
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return { bytes, truncated };
+}
+
+/** Runs one command on the device, streaming `input` into it and capping what comes back. */
+async function shellCommand(
+  adb: Adb,
+  command: string,
+  options: { readonly input?: string } | undefined,
+): Promise<AndroidShellResult> {
+  const shell = adb.subprocess.shellProtocol;
+  const input = options?.input;
+
+  // Without the shell protocol there is no stdin, no exit code and no separate stderr. A
+  // command that needs stdin cannot be run at all, which is a fact worth reporting rather
+  // than silently sending something the device will ignore.
+  if (!shell) {
+    if (input !== undefined && input !== "") {
+      throw new Error(
+        "This device's adb transport has no stdin channel, so a command cannot be given a " +
+          "script to read. Run it with the script written to a file instead.",
+      );
+    }
+    const result = await adb.subprocess.noneProtocol.spawnWaitText(command);
+    return { stdout: result.trim(), stderr: "", code: 0, truncated: false, timedOut: false };
+  }
+
+  const process = await shell.spawn(command);
+  const decoder = new TextDecoder();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    void process.kill();
+  }, SHELL_TIMEOUT_MS);
+
+  const write = (async () => {
+    const writer = process.stdin.getWriter();
+    try {
+      if (input !== undefined && input !== "") await writer.write(new TextEncoder().encode(input));
+    } catch {
+      // A command that exits without reading stdin closes the pipe under us; that is its
+      // right, and the output is what matters.
+    } finally {
+      await writer.close().catch(() => undefined);
+    }
+  })();
+
+  try {
+    const [out, err] = await Promise.all([
+      collect(process.stdout as ReadableStream<Uint8Array>, SHELL_OUTPUT_LIMIT),
+      collect(process.stderr as ReadableStream<Uint8Array>, SHELL_OUTPUT_LIMIT),
+    ]);
+    await write;
+    const code = await process.exited;
+    return {
+      stdout: decoder.decode(out.bytes),
+      stderr: decoder.decode(err.bytes),
+      code,
+      truncated: out.truncated || err.truncated,
+      timedOut,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function shellText(adb: Adb, command: readonly string[]): Promise<string> {
@@ -166,9 +301,45 @@ export function createWebUsbAdbConnector(): WebUsbAdbConnector | null {
         });
 
         let closed = false;
+        const open = () => {
+          if (closed) throw new Error("This Android device is no longer connected.");
+          return adb as Adb;
+        };
         return {
           info,
           disconnected: adb.disconnected,
+          shell: (command, options) => shellCommand(open(), command, options),
+          pull: async (remote) => {
+            const sync = await open().sync();
+            try {
+              const { bytes, truncated } = await collect(
+                sync.read(remote) as ReadableStream<Uint8Array>,
+                FILE_LIMIT,
+              );
+              if (truncated) {
+                throw new Error(`${remote} is larger than the ${FILE_LIMIT >> 20} MB limit.`);
+              }
+              return bytes;
+            } finally {
+              await sync.dispose().catch(() => undefined);
+            }
+          },
+          push: async (remote, bytes, permission) => {
+            const sync = await open().sync();
+            try {
+              await sync.write({
+                filename: remote,
+                file: AdbReadableStream.from(
+                  (function* () {
+                    yield bytes;
+                  })(),
+                ),
+                ...(permission === undefined ? {} : { permission }),
+              });
+            } finally {
+              await sync.dispose().catch(() => undefined);
+            }
+          },
           close: async () => {
             if (closed) return;
             closed = true;

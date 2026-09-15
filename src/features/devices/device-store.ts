@@ -5,6 +5,7 @@ import {
   type AndroidDeviceInfo,
   type AndroidUsbDevice,
 } from "../../lib/device/webusb-adb";
+import type { DeviceBridge } from "../../lib/agent/device-bridge";
 
 export type DeviceStatus = "unsupported" | "idle" | "connecting" | "connected" | "error";
 
@@ -151,6 +152,40 @@ export function createDeviceStore() {
     name: device()?.name ?? null,
   });
 
+  /**
+   * The device, as the agent sees it.
+   *
+   * The agent is not a second client of the device: it drives the same one session the dialog
+   * does, through the same connection object, so a command it runs and a fact the dialog shows
+   * can never disagree about which phone is attached. What differs is only the shape — the
+   * dialog reads state, the agent asks for work — and the two failure modes worth naming:
+   * no device at all, and a device that went away mid-session.
+   */
+  const requireConnection = (): AndroidDeviceConnection => {
+    if (!connection) {
+      throw new Error(
+        "No Android device is connected. Connecting one needs a person: it is Chrome's USB " +
+          "picker, and it only opens from a click in the app. Ask the user to attach the device " +
+          "from the sidebar, then try again.",
+      );
+    }
+    return connection;
+  };
+
+  const bridge: DeviceBridge = {
+    describe(): string | null {
+      const info = device();
+      if (!info) return null;
+      return (
+        `${info.name} (${info.serial}) — Android ${info.androidVersion}, ${info.abi}, ` +
+        `build ${info.build}, SELinux ${info.selinux}, root ${info.root}`
+      );
+    },
+    shell: (command, input) => requireConnection().shell(command, input ? { input } : undefined),
+    pull: (remote) => requireConnection().pull(remote),
+    push: (remote, bytes, permission) => requireConnection().push(remote, bytes, permission),
+  };
+
   void refresh();
   onCleanup(() => {
     disposed = true;
@@ -167,6 +202,7 @@ export function createDeviceStore() {
     refresh,
     connect,
     requestAndConnect,
+    bridge,
     disconnect,
   };
 }

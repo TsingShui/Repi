@@ -62,6 +62,8 @@ function MainApp() {
       save: (path, bytes, conversationId) =>
         conversations.saveVirtualFile(path, bytes, conversationId),
     },
+    // The agent drives the same session the dialog shows; see the store's `bridge`.
+    device: devices.bridge,
   });
   const finePointer = createFinePointer();
 
