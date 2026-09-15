@@ -10,10 +10,10 @@
  * providers because pi builds it the same way from each one's numbers (prompt, completion and
  * cache reads kept apart rather than folded together).
  */
-import type { Message } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 /** Tokens the last exchange carried: the best estimate of what the next request will send. */
-export function contextUsed(messages: readonly Message[]): number {
+export function contextUsed(messages: readonly AgentMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role !== "assistant") continue;

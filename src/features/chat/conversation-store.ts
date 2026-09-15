@@ -1,5 +1,6 @@
 import { createSignal, onCleanup } from "solid-js";
-import type { Message, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { createWorkspaceStorage, type StorageUsage, type StoredFile } from "../../lib/storage/workspace-storage";
 import type { ChatLine, Conversation } from "./types";
 
@@ -177,7 +178,7 @@ export function createConversationStore() {
     enqueue(() => storage.putConversation(conversation));
   };
 
-  const setAgentMessages = (conversationId: string, messages: readonly Message[]) => {
+  const setAgentMessages = (conversationId: string, messages: readonly AgentMessage[]) => {
     let updated: Conversation | undefined;
     setConversations((current) =>
       current.map((conversation) => {

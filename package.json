@@ -19,7 +19,8 @@
     "check:menu": "node ./scripts/menu-check.mjs",
     "check:model": "node ./scripts/run-analysis-check.mjs model-facts-check",
     "check:mentions": "node ./scripts/run-analysis-check.mjs mention-check",
-    "check:files": "node ./scripts/run-analysis-check.mjs text-files-check"
+    "check:files": "node ./scripts/run-analysis-check.mjs text-files-check",
+    "check:compaction": "node ./scripts/run-analysis-check.mjs compaction-check"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",

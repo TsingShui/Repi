@@ -42,6 +42,14 @@ export interface ChatScreenProps {
   /** Tokens the last exchange carried, and what this model can hold. */
   readonly contextUsed: number;
   readonly modelLimits: ModelLimits | null;
+  /**
+   * Whether summarizing would free room now, and how to do it.
+   *
+   * Offered when the next request would cross pi's threshold rather than on a timer: before that
+   * the conversation is fine, and a button that says otherwise is a button that nags.
+   */
+  readonly canCompact: boolean;
+  readonly onCompact: () => void;
   readonly onSelectModel: (key: string) => void;
   readonly onAddProvider: () => void;
   readonly onOpenSidebar: () => void;
@@ -500,6 +508,16 @@ export function ChatScreen(props: ChatScreenProps) {
                   />
                   <Show when={props.modelLimits}>
                     {(limits) => <ContextMeter used={props.contextUsed} limits={limits()} />}
+                  </Show>
+                  <Show when={props.canCompact && !props.working}>
+                    <button
+                      class="composer-compact"
+                      type="button"
+                      onClick={props.onCompact}
+                      title="Summarize the older part of this conversation to free room; recent messages are kept as they are."
+                    >
+                      Summarize
+                    </button>
                   </Show>
                 </div>
 

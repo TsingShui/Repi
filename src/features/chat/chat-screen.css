@@ -752,3 +752,22 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
     transition: none;
   }
 }
+
+/*
+ * The one action the context meter implies: when the next request would not fit, say so and offer
+ * the fix beside the number that describes the problem.
+ */
+.composer-compact {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  padding: 5px 10px;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.composer-compact:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
+}

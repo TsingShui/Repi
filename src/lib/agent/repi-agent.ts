@@ -1,9 +1,13 @@
-import { Agent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core";
+import {
+  Agent,
+  convertToLlm,
+  type AgentMessage,
+  type AgentTool,
+} from "@earendil-works/pi-agent-core";
 import {
   Type,
   type Api,
   type AssistantMessage,
-  type Message,
   type Model,
 } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
@@ -20,6 +24,14 @@ import type { SandboxOutcome } from "./quickjs-sandbox";
 import { customModel, resolveThinkingLevel } from "../../features/models/model-facts";
 import { deviceParagraph, deviceTools } from "./device-tools";
 import { fileTools } from "./file-tools";
+import {
+  COMPACTION,
+  needsCompaction,
+  planCompaction,
+  summarize,
+  summaryMessage,
+  type CompactionOutcome,
+} from "./compaction";
 import type { DeviceBridge } from "./device-bridge";
 
 const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a browser.
@@ -61,6 +73,14 @@ export interface AgentRunCallbacks {
    * the conversation is not full after the last turn, it is full after the fourth tool call.
    */
   readonly onUsage?: (usage: Usage) => void;
+  /**
+   * Older messages were summarized to make room.
+   *
+   * The page is told because the transcript it shows and stores is its business: the summary is
+   * part of the messages that come back, but "the first forty messages are gone" is a fact the
+   * user should be able to see rather than infer from a gap.
+   */
+  readonly onCompacted?: (outcome: CompactionOutcome) => void;
 }
 
 /** A file the user pointed at with `@`, resolved before the run starts. */
@@ -74,7 +94,8 @@ export interface AgentReference {
 }
 
 export interface AgentRunResult {
-  readonly messages: readonly Message[];
+  /** The transcript to keep: pi's messages, including a summary if one was made. */
+  readonly messages: readonly AgentMessage[];
   readonly text: string;
   readonly error: string | null;
 }
@@ -371,13 +392,25 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     },
   ];
 
-  const run = async (
+  /**
+   * The conversation's model, its key, and how to stream from it.
+   *
+   * Shared with compaction because a summary is a request like any other: same provider, same
+   * model, same key. Anything else would be a second opinion about which model this conversation
+   * is having.
+   */
+  const resolveChoice = async (
     conversation: Conversation,
     providers: readonly ModelProvider[],
-    text: string,
-    callbacks: AgentRunCallbacks,
-    references: readonly AgentReference[] = [],
-  ): Promise<AgentRunResult> => {
+  ): Promise<{
+    model: Model<Api>;
+    apiKey: string;
+    providerStream: (
+      model: Model<Api>,
+      context: Parameters<typeof streamSimple>[1],
+      options: Parameters<typeof streamSimple>[2],
+    ) => ReturnType<typeof streamSimple>;
+  }> => {
     const selectedKey = conversation.selectedModelKey;
     if (!selectedKey) throw new Error("Choose a model before sending a message.");
     const choice = selectedProvider(providers, selectedKey);
@@ -410,15 +443,78 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
         piProvider.streamSimple(activeModel, context, streamOptions);
     }
 
+    return { model, apiKey, providerStream };
+  };
+
+  /** One request, completing rather than streaming: what a summary needs. */
+  const completeOnce = (
+    providerStream: (model: Model<Api>, context: Parameters<typeof streamSimple>[1], options: Parameters<typeof streamSimple>[2]) => ReturnType<typeof streamSimple>,
+  ) => async (model: Model<string>, context: Parameters<typeof streamSimple>[1], options?: Parameters<typeof streamSimple>[2]) =>
+    providerStream(model as Model<Api>, context, { ...options, timeoutMs: 120_000 }).result();
+
+  /**
+   * Summarizes the older part of a transcript, if there is a plan for it.
+   *
+   * Returns null when there is nothing to do — a short conversation, or one that is already one
+   * turn — so callers can run it unconditionally where the threshold is not the question.
+   */
+  const compactMessages = async (
+    messages: readonly AgentMessage[],
+    options: {
+      readonly model: Model<Api>;
+      readonly providerStream: (model: Model<Api>, context: Parameters<typeof streamSimple>[1], options: Parameters<typeof streamSimple>[2]) => ReturnType<typeof streamSimple>;
+      readonly thinkingLevel: ReturnType<typeof resolveThinkingLevel>;
+      readonly instructions?: string;
+    },
+  ): Promise<{ messages: AgentMessage[]; outcome: CompactionOutcome } | null> => {
+    const plan = planCompaction(messages, COMPACTION);
+    if (plan === null) return null;
+    const outcome = await summarize(plan, {
+      model: options.model,
+      ...(options.thinkingLevel === "off" ? {} : { thinkingLevel: options.thinkingLevel }),
+      ...(options.instructions ? { instructions: options.instructions } : {}),
+      complete: completeOnce(options.providerStream),
+    });
+    return {
+      messages: [summaryMessage(outcome.summary, outcome.tokensBefore), ...outcome.keep],
+      outcome,
+    };
+  };
+
+  const run = async (
+    conversation: Conversation,
+    providers: readonly ModelProvider[],
+    text: string,
+    callbacks: AgentRunCallbacks,
+    references: readonly AgentReference[] = [],
+  ): Promise<AgentRunResult> => {
+    const { model, apiKey, providerStream } = await resolveChoice(conversation, providers);
     // What the conversation asked for, folded into what this model accepts: a model that cannot
     // think runs at "off" instead of failing, and one that names its levels differently gets
     // its own name for the one that was asked for.
     const thinkingLevel = resolveThinkingLevel(model, conversation.thinkingLevel);
 
+    /*
+     * Compact before the first request when the transcript is already over the threshold. The
+     * check is on the transcript rather than on the last report, because the last report is from
+     * the previous turn: by the time a request fails for being too long, it is already too late
+     * to fix it in that turn.
+     */
+    let seed = seedMessages(conversation);
+    if (needsCompaction(seed, model.contextWindow)) {
+      const compacted = await compactMessages(seed, { model, providerStream, thinkingLevel });
+      if (compacted) {
+        seed = compacted.messages;
+        callbacks.onCompacted?.(compacted.outcome);
+      }
+    }
+
     let completedText = "";
     let currentText = "";
     let finalError: string | null = null;
     let turns = 0;
+    /** Set when a turn ended because the context filled: the run continues after compacting. */
+    let compacting = false;
     const visibleText = () => [completedText, currentText].filter(Boolean).join("\n\n");
     const agent = new Agent({
       initialState: {
@@ -426,7 +522,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
         model,
         thinkingLevel,
         tools: toolsFor(conversation),
-        messages: seedMessages(conversation),
+        messages: seed,
       },
       streamFn: (activeModel, context, streamOptions) =>
         providerStream(activeModel, context, {
@@ -434,10 +530,20 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
           timeoutMs: 120_000,
           maxRetries: 1,
         }),
+      // pi's own converter, so a `compactionSummary` message in the transcript reaches the
+      // provider as the `<summary>` block pi builds, rather than as a role nobody sends.
+      convertToLlm,
       getApiKey: () => apiKey,
       shouldStopAfterTurn: () => {
         turns += 1;
-        return turns >= 12;
+        if (turns >= 12) return true;
+        // Stop *before* the next request rather than after it fails: the context is over its
+        // threshold, and the run resumes with the compacted transcript a moment later.
+        if (needsCompaction(agent.state.messages, model.contextWindow)) {
+          compacting = true;
+          return true;
+        }
+        return false;
       },
       sessionId: conversation.id,
     });
@@ -497,10 +603,39 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
           ? text
           : `${text}\n\n[the user pointed at ${described.length === 1 ? "this file" : "these files"}]\n${described.join("\n")}`,
       );
+
+      /*
+       * A turn that ended because the context filled resumes here.
+       *
+       * The transcript is rewritten in the agent's own state — the summary at its head, the recent
+       * messages after it — and `continue()` takes a fresh snapshot of exactly that, which is what
+       * makes this a continuation rather than a second question. Bounded, because a summary
+       * that does not free enough room would otherwise loop: three rounds in, the run stops and
+       * the error is the honest outcome.
+       */
+      for (let round = 0; compacting && round < 3; round += 1) {
+        compacting = false;
+        const compacted = await compactMessages(agent.state.messages, {
+          model,
+          providerStream,
+          thinkingLevel,
+        });
+        if (!compacted) break;
+        agent.state.messages = [...compacted.messages];
+        callbacks.onCompacted?.(compacted.outcome);
+        turns = 0;
+        await agent.continue();
+      }
+
       return {
         messages: agent.state.messages.filter(
-          (message): message is Message =>
-            message.role === "user" || message.role === "assistant" || message.role === "toolResult",
+          (message): message is AgentMessage =>
+            message.role === "user" ||
+            message.role === "assistant" ||
+            message.role === "toolResult" ||
+            // The summary is part of what is kept: it is the head of the transcript the next run
+            // starts from, and dropping it here would silently forget the compacted history.
+            message.role === "compactionSummary",
         ),
         text: visibleText(),
         error: finalError,
@@ -509,6 +644,27 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
       unsubscribe();
       if (activeAgent === agent) activeAgent = null;
     }
+  };
+
+  /**
+   * Summarizes this conversation now, without asking anything.
+   *
+   * The same work the automatic path does, on demand: a person who can see the meter filling up
+   * should not have to wait for the wall to hit it. Returns the messages to store — the summary
+   * and the tail that was kept — or null when there is nothing worth summarizing.
+   */
+  const compact = async (
+    conversation: Conversation,
+    providers: readonly ModelProvider[],
+    instructions?: string,
+  ): Promise<{ messages: AgentMessage[]; outcome: CompactionOutcome } | null> => {
+    const { model, providerStream } = await resolveChoice(conversation, providers);
+    return compactMessages(seedMessages(conversation), {
+      model,
+      providerStream,
+      thinkingLevel: resolveThinkingLevel(model, conversation.thinkingLevel),
+      ...(instructions ? { instructions } : {}),
+    });
   };
 
   const abort = () => activeAgent?.abort();
@@ -520,5 +676,5 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     }
   };
 
-  return { run, abort, disposeConversation };
+  return { run, compact, abort, disposeConversation };
 }

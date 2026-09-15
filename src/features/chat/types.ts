@@ -1,4 +1,5 @@
-import type { Message, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { EngineId } from "../../lib/detect-format";
 
 /** One thing in a transcript, in the order it happened. */
@@ -41,6 +42,12 @@ export interface Conversation extends ConversationSummary {
    * this app has always run at, so upgrading does not silently start spending tokens.
    */
   readonly thinkingLevel?: ModelThinkingLevel;
-  /** Pi's provider/tool transcript, persisted separately from presentation lines. */
-  readonly agentMessages?: readonly Message[];
+  /**
+   * Pi's provider/tool transcript, persisted separately from presentation lines.
+   *
+   * `AgentMessage` rather than `Message`, because a compacted conversation starts with pi's own
+   * summary message — a role that never goes to a provider as it stands, and that pi's converter
+   * turns into a `<summary>` block on the way out.
+   */
+  readonly agentMessages?: readonly AgentMessage[];
 }

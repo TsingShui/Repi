@@ -12,8 +12,9 @@ import { createDeviceStore } from "./features/devices/device-store";
 import { ProviderDialog } from "./features/models/provider-dialog";
 import { createModelStore } from "./features/models/model-store";
 import { modelLimits, thinkingOptions, type ModelLimits } from "./features/models/model-facts";
-import { contextUsed } from "./features/chat/context-usage";
+import { contextUsed, formatTokens } from "./features/chat/context-usage";
 import type { MentionTarget } from "./features/chat/mentions";
+import { COMPACTION, needsCompaction } from "./lib/agent/compaction";
 import type { StoredFile } from "./lib/storage/workspace-storage";
 import { StorageDialog } from "./features/storage/storage-dialog";
 import { modelKey, type ModelProvider } from "./features/models/types";
@@ -73,6 +74,7 @@ function MainApp() {
     device: devices.bridge,
   });
   const finePointer = createFinePointer();
+  const [compacting, setCompacting] = createSignal(false);
 
   /** `provider-id:model-id` resolved against the configured providers. */
   const selection = (providers: readonly ModelProvider[], key: string) => {
@@ -269,6 +271,34 @@ function MainApp() {
       ? "Could not reach the model provider. Check its Base URL, API key, and browser CORS settings."
       : raw;
 
+  /**
+   * Summarizes the older part of the conversation on request.
+   *
+   * What comes back is the transcript it produced — the summary and the kept tail — so this is
+   * the same shape the automatic path leaves behind, and the user sees the same note either way.
+   */
+  async function compactConversation() {
+    if (compacting()) return;
+    setCompacting(true);
+    try {
+      const active = conversations.active();
+      const result = await agentRuntime.compact(active, models.providers());
+      if (!result) return;
+      conversations.setAgentMessages(active.id, result.messages);
+      conversations.appendTo(active.id, [
+        {
+          kind: "note",
+          text: `Summarized ${result.outcome.summarizedCount} earlier messages (about ${formatTokens(result.outcome.tokensBefore)} tokens); the recent ones are kept as they are.`,
+        },
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The conversation could not be summarized.";
+      conversations.appendTo(conversations.activeId(), [{ kind: "note", text: message }]);
+    } finally {
+      setCompacting(false);
+    }
+  }
+
   async function send(text: string, mentions: readonly MentionTarget[] = []) {
     if (agentWorking()) return;
     setAgentWorking(true);
@@ -432,6 +462,11 @@ function MainApp() {
               onSelectThinkingLevel={conversations.selectThinkingLevel}
               contextUsed={tokensUsed()}
               modelLimits={limits()}
+              canCompact={
+                limits() !== null &&
+                needsCompaction(conversations.active().agentMessages ?? [], limits()!.contextWindow, COMPACTION)
+              }
+              onCompact={() => void compactConversation()}
               onAddProvider={() => setProviderDialogOpen(true)}
               onOpenSidebar={() => setSidebarOpen(true)}
             />
