@@ -56,6 +56,16 @@ export interface AgentRunCallbacks {
   readonly onUsage?: (usage: Usage) => void;
 }
 
+/** A file the user pointed at with `@`, resolved before the run starts. */
+export interface AgentReference {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "attachment" | "derived";
+  readonly bytes: number;
+  readonly sandboxPath?: string;
+  readonly fileId?: string;
+}
+
 export interface AgentRunResult {
   readonly messages: readonly Message[];
   readonly text: string;
@@ -309,6 +319,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     providers: readonly ModelProvider[],
     text: string,
     callbacks: AgentRunCallbacks,
+    references: readonly AgentReference[] = [],
   ): Promise<AgentRunResult> => {
     const selectedKey = conversation.selectedModelKey;
     if (!selectedKey) throw new Error("Choose a model before sending a message.");
@@ -409,7 +420,26 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     });
 
     try {
-      await agent.prompt(text);
+      /*
+       * A mention is a name; the model needs a place. The user's sentence is sent as written, and
+       * the files it points at follow it, described in the same terms the sandbox and `run_js`
+       * use — a path a program can open, or the id a binary is loaded under. Without this the
+       * `@` is decoration the model can only guess about.
+       */
+      const described = references.map((reference) =>
+        reference.kind === "attachment"
+          ? `- ${reference.name} — the attached binary, ${reference.bytes} bytes${
+              reference.fileId ? `, fileId ${reference.fileId} for run_js` : ""
+            }`
+          : `- ${reference.id} — ${reference.bytes} bytes, in the sandbox at ${
+              reference.sandboxPath ?? reference.id
+            }`,
+      );
+      await agent.prompt(
+        described.length === 0
+          ? text
+          : `${text}\n\n[the user pointed at ${described.length === 1 ? "this file" : "these files"}]\n${described.join("\n")}`,
+      );
       return {
         messages: agent.state.messages.filter(
           (message): message is Message =>

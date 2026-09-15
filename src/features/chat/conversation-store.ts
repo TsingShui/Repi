@@ -413,6 +413,14 @@ export function createConversationStore() {
       );
       return loaded;
     },
+    /**
+     * What is in the shared filesystem, by metadata only.
+     *
+     * The `@` menu answers a question about names, and answering it must not cost a copy of every
+     * file an engine ever produced — `listVirtualFiles` right above loads all of them for the
+     * sandbox, which is a different job with a different price.
+     */
+    listDerivedFiles: async (): Promise<readonly StoredFile[]> => storage.listDerived(),
     /** Keeps a file a program produced, under the path the sandbox knows it by. */
     saveVirtualFile: async (path: string, bytes: Uint8Array, conversationId: string) => {
       await storage.saveDerived(path, bytes, conversationId);

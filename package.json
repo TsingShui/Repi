@@ -17,7 +17,8 @@
     "check:device": "node ./scripts/device-check.mjs",
     "check:device-tools": "node ./scripts/run-analysis-check.mjs device-tools-check",
     "check:menu": "node ./scripts/menu-check.mjs",
-    "check:model": "node ./scripts/run-analysis-check.mjs model-facts-check"
+    "check:model": "node ./scripts/run-analysis-check.mjs model-facts-check",
+    "check:mentions": "node ./scripts/run-analysis-check.mjs mention-check"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",

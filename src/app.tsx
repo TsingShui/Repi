@@ -13,6 +13,8 @@ import { ProviderDialog } from "./features/models/provider-dialog";
 import { createModelStore } from "./features/models/model-store";
 import { modelLimits, thinkingOptions, type ModelLimits } from "./features/models/model-facts";
 import { contextUsed } from "./features/chat/context-usage";
+import type { MentionTarget } from "./features/chat/mentions";
+import type { StoredFile } from "./lib/storage/workspace-storage";
 import { StorageDialog } from "./features/storage/storage-dialog";
 import { modelKey, type ModelProvider } from "./features/models/types";
 import "./app.css";
@@ -102,6 +104,48 @@ function MainApp() {
   );
   const tokensUsed = () =>
     liveUsage() ?? contextUsed(conversations.active().agentMessages ?? []);
+
+  /**
+   * Everything `@` can point at: the binaries attached to this conversation, and the shared
+   * filesystem everything can read.
+   *
+   * Rebuilt when the conversation changes or its files do — an attachment arrives as a line, and
+   * a derived file appears when a run finishes — so the menu never offers something that a
+   * moment ago did not exist.
+   */
+  const [derivedFiles, setDerivedFiles] = createSignal<readonly StoredFile[]>([]);
+  createEffect(
+    () => [conversations.activeId(), conversations.active().lines.length, conversations.usage()] as const,
+    () => {
+      void conversations.listDerivedFiles().then(setDerivedFiles);
+    },
+  );
+  const mentionTargets = (): readonly MentionTarget[] => {
+    const attached = conversations
+      .active()
+      .lines.filter((line) => line.kind === "file")
+      .map((line) => ({
+        id: line.name,
+        name: line.name,
+        kind: "attachment" as const,
+        bytes: line.size,
+        ...(line.storedFileId ? { fileId: line.storedFileId } : {}),
+      }));
+    const derived = derivedFiles().flatMap((record) =>
+      record.path === undefined
+        ? []
+        : [
+            {
+              id: record.path,
+              name: record.name,
+              kind: "derived" as const,
+              bytes: record.size,
+              sandboxPath: `/work/${record.path}`,
+            },
+          ],
+    );
+    return [...attached, ...derived];
+  };
 
   const [limits, setLimits] = createSignal<ModelLimits | null>(null);
   const [thinkingLevels, setThinkingLevels] = createSignal<readonly ModelThinkingLevel[]>(["off"]);
@@ -223,7 +267,7 @@ function MainApp() {
       ? "Could not reach the model provider. Check its Base URL, API key, and browser CORS settings."
       : raw;
 
-  async function send(text: string) {
+  async function send(text: string, mentions: readonly MentionTarget[] = []) {
     if (agentWorking()) return;
     setAgentWorking(true);
     let runIds: { readonly conversationId: string; readonly lineId: string } | null = null;
@@ -247,7 +291,7 @@ function MainApp() {
         },
         // Live, because a turn is several requests and the meter should be right during one.
         onUsage: (usage) => setLiveUsage(usage.totalTokens),
-      });
+      }, mentions);
       conversations.updateAssistant(conversation.id, lineId, {
         text: result.error
           ? agentErrorMessage(result.error)
@@ -372,7 +416,8 @@ function MainApp() {
             <ChatScreen
               conversationId={conversations.activeId()}
               lines={conversations.active().lines}
-              onSend={(text) => void send(text)}
+              onSend={(text, mentions) => void send(text, mentions)}
+              mentionTargets={mentionTargets()}
               working={agentWorking()}
               onStop={agentRuntime.abort}
               onPick={(file) => void accept(file)}

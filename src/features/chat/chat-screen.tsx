@@ -5,6 +5,15 @@ import { StructureField } from "../about/structure-field";
 import { ModelSelector } from "../models/model-selector";
 import { ThinkingSelector } from "../models/thinking-selector";
 import { ContextMeter } from "./context-meter";
+import { applyMenuPlacement, placeMenu } from "../../lib/menu-placement";
+import { MentionMenu } from "./mention-menu";
+import {
+  insertMention,
+  matchMentions,
+  mentionToken,
+  parseMentions,
+  type MentionTarget,
+} from "./mentions";
 import type { ModelLimits } from "../models/model-facts";
 import type { ModelProvider } from "../models/types";
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
@@ -16,7 +25,10 @@ export type { ChatLine } from "./types";
 export interface ChatScreenProps {
   readonly conversationId: string;
   readonly lines: readonly ChatLine[];
-  readonly onSend: (text: string) => void;
+  /** Sends the message, with the files it mentions resolved and handed over. */
+  readonly onSend: (text: string, mentions: readonly MentionTarget[]) => void;
+  /** Everything the user can point at with `@`. */
+  readonly mentionTargets: readonly MentionTarget[];
   readonly working: boolean;
   readonly onStop: () => void;
   readonly onPick: (file: File | undefined) => void;
@@ -100,6 +112,20 @@ function FileInput(props: {
  */
 export function ChatScreen(props: ChatScreenProps) {
   const [text, setText] = createSignal("");
+  /*
+   * The `@` menu, as state: which token is being typed and which row is highlighted. The token is
+   * recomputed from the message and the caret rather than remembered as a range, so editing the
+   * sentence never leaves the menu pointing at text that has moved.
+   */
+  const [mention, setMention] = createSignal<{ start: number; end: number; query: string } | null>(
+    null,
+  );
+  const [mentionIndex, setMentionIndex] = createSignal(0);
+  let mentionAnchor: HTMLDivElement | undefined;
+  const mentionMatches = () => {
+    const token = mention();
+    return token === null ? [] : matchMentions(props.mentionTargets, token.query);
+  };
   const [greetingIndex, setGreetingIndex] = createSignal(
     Math.floor(Math.random() * GREETINGS.length),
   );
@@ -197,10 +223,52 @@ export function ChatScreen(props: ChatScreenProps) {
     });
   };
 
+  /** Recomputes what the caret is inside of, and offers the files that match it. */
+  const updateMention = (area: HTMLTextAreaElement) => {
+    const token = mentionToken(area.value, area.selectionStart ?? area.value.length);
+    setMention(token);
+    setMentionIndex(0);
+    if (token !== null) placeMentionMenu(area);
+  };
+
+  /** Takes the chosen file: the name replaces what was typed, and the caret moves past it. */
+  const acceptMention = (target: MentionTarget) => {
+    const token = mention();
+    if (token === null || !input) return;
+    const written = insertMention(input.value, token, target.id);
+    setText(written.text);
+    setMention(null);
+    // After the value is set, not before: the caret can only be placed in text that exists.
+    queueMicrotask(() => {
+      input?.focus();
+      input?.setSelectionRange(written.caret, written.caret);
+      grow();
+    });
+  };
+
+  /*
+   * The menu opens above the composer, where there is room: `placeMenu` decides which side, and
+   * the textarea is the anchor because the caret cannot be measured directly.
+   */
+  const placeMentionMenu = (area: HTMLTextAreaElement) => {
+    const anchor = mentionAnchor;
+    if (!anchor) return;
+    // The box is the anchor rather than the textarea: the textarea grows with the message, and a
+    // menu anchored to a growing box drifts as it grows.
+    // What scrolls is the menu inside, so the content height comes from there: the anchor's own
+    // height is whatever its cap already made it, and measuring that is a menu that shrinks.
+
+    const content = anchor.querySelector<HTMLElement>(".mention-menu");
+    applyMenuPlacement(anchor, placeMenu(area, anchor, { gap: 10, content }));
+  };
+
   const submit = () => {
     const value = text().trim();
     if (!value || !canSend()) return;
-    props.onSend(value);
+    setMention(null);
+    // Resolved here, where the text and the file list meet: what the model reads is the user's
+    // message with the files it points at described in the terms its own tools use.
+    props.onSend(value, parseMentions(value, props.mentionTargets));
     setText("");
     if (input) {
       input.style.height = "auto";
@@ -345,6 +413,16 @@ export function ChatScreen(props: ChatScreenProps) {
             }}
           >
             <div class="composer-box">
+              <Show when={mention() !== null}>
+                <div ref={(node) => (mentionAnchor = node)} class="mention-anchor">
+                  <MentionMenu
+                    targets={mentionMatches()}
+                    active={mentionIndex()}
+                    onHover={setMentionIndex}
+                    onPick={acceptMention}
+                  />
+                </div>
+              </Show>
               <textarea
                 class="composer-input"
                 ref={(node) => (input = node)}
@@ -354,9 +432,36 @@ export function ChatScreen(props: ChatScreenProps) {
                 value={text()}
                 onInput={(event) => {
                   setText(event.currentTarget.value);
+                  updateMention(event.currentTarget);
                   grow();
                 }}
+                onClick={(event) => updateMention(event.currentTarget)}
+                onBlur={() => setMention(null)}
                 onKeyDown={(event) => {
+                  // While the file menu is open it owns the keys a menu owns: arrows to choose,
+                  // Enter or Tab to take the file, Escape to leave the word alone.
+                  if (mention() !== null) {
+                    const matches = mentionMatches();
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      if (matches.length > 0) {
+                        const step = event.key === "ArrowDown" ? 1 : -1;
+                        setMentionIndex((current) => (current + step + matches.length) % matches.length);
+                      }
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === "Tab") {
+                      event.preventDefault();
+                      const chosen = matches[mentionIndex()];
+                      if (chosen) acceptMention(chosen);
+                      return;
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setMention(null);
+                      return;
+                    }
+                  }
                   // Enter sends and Shift+Enter starts a line, which is what a chat
                   // interface does; a touch keyboard's return key is a real newline,
                   // because Shift cannot be held on a glass keyboard.

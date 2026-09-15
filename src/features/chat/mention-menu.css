@@ -1,0 +1,79 @@
+/*
+ * The `@` menu: a list of files, anchored to the message box.
+ *
+ * Narrow on purpose. It opens above the composer while someone is mid-sentence, so it reads as a
+ * completion of the word being typed rather than as a panel that took over the screen: one file
+ * per row, name first, and everything else small and grey.
+ */
+/*
+ * Two elements, two jobs: the anchor is the box that gets positioned and measured, the menu is
+ * what scrolls. They are separate because measurement must not read a box that its own cap has
+ * already shrunk — that is the mistake that made the model menu collapse to one row.
+ */
+.mention-anchor {
+  position: absolute;
+  z-index: 7;
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: flex;
+}
+
+.mention-anchor[data-placement="down"] {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+.mention-menu {
+  display: flex;
+  flex-direction: column;
+  width: min(320px, calc(100vw - 32px));
+  /* The ceiling the placement computed arrives on the anchor, which is where it is set. */
+  max-height: var(--menu-max, min(280px, 42vh));
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  padding: 5px;
+  box-shadow: var(--panel-lift);
+}
+
+.mention-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: var(--r-sm, 8px);
+  background: transparent;
+  padding: 7px 9px;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.mention-option[data-active="true"] {
+  background: rgb(0 0 0 / 6%);
+}
+
+.mention-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mention-option-meta {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mention-empty {
+  margin: 6px 9px;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
