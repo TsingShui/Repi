@@ -274,7 +274,7 @@ export function createConversationStore() {
   ): Promise<string> => {
     setStorageError(null);
     try {
-      await storage.requestPersistence().catch(() => false);
+      await storage.requestPersistence();
       const stored = await storage.saveFile(conversationId, file, onProgress);
 
       // A large write may finish after its conversation was deleted. Clean it up
@@ -338,12 +338,6 @@ export function createConversationStore() {
     await refreshStorage();
   };
 
-  const keepStorage = async (): Promise<"granted" | "denied" | "unsupported"> => {
-    const verdict = await storage.requestPersistence().catch((): "denied" => "denied");
-    await refreshUsage();
-    return verdict;
-  };
-
   return {
     conversations,
     active,
@@ -364,7 +358,6 @@ export function createConversationStore() {
     saveFile,
     removeFile,
     removeAllFiles,
-    keepStorage,
     openFile: storage.openFile,
 
     /**

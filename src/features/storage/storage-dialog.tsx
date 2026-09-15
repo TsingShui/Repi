@@ -14,7 +14,6 @@ export interface StorageDialogProps {
   readonly onClose: () => void;
   readonly onDeleteFile: (id: string) => Promise<void>;
   readonly onDeleteAll: () => Promise<void>;
-  readonly onKeep: () => Promise<"granted" | "denied" | "unsupported">;
 }
 
 /** What the transcript already knows about a cached file, offered back in the panel. */
@@ -197,12 +196,10 @@ function TreeRow(props: {
                 <path d="M14 3v4h4" />
               </svg>
             </span>
-            <span class="storage-file-copy">
-              <span class="storage-file-name" title={file().name}>
-                {file().name}
-              </span>
-              <span class="storage-file-facts">{file().facts}</span>
+            <span class="storage-file-name" title={file().name}>
+              {file().name}
             </span>
+            <span class="storage-tree-meta">{file().facts}</span>
             <button
               type="button"
               class="storage-file-delete"
@@ -238,11 +235,9 @@ function TreeRow(props: {
                   <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 </svg>
               </span>
-              <span class="storage-file-copy">
-                <span class="storage-file-name">{dir().name}/</span>
-                <span class="storage-file-facts">
-                  {dir().files} file{dir().files === 1 ? "" : "s"} · {formatBytes(dir().bytes)}
-                </span>
+              <span class="storage-file-name">{dir().name}/</span>
+              <span class="storage-tree-meta">
+                {dir().files} file{dir().files === 1 ? "" : "s"} · {formatBytes(dir().bytes)}
               </span>
             </button>
             <Show when={open()}>
@@ -264,8 +259,6 @@ function TreeRow(props: {
 export function StorageDialog(props: StorageDialogProps) {
   const [busyId, setBusyId] = createSignal<string | null>(null);
   const [confirmingAll, setConfirmingAll] = createSignal(false);
-  /** What the browser answered when asked to keep this storage. Null: not asked yet. */
-  const [keepVerdict, setKeepVerdict] = createSignal<"granted" | "denied" | "unsupported" | null>(null);
   let dialog: HTMLDialogElement | undefined;
 
   createEffect(
@@ -357,50 +350,15 @@ export function StorageDialog(props: StorageDialogProps) {
           <span class="storage-chip" data-retention={props.usage?.persisted ? "persistent" : "best-effort"}>
             {props.usage?.persisted ? "Persistent" : "Best effort"}
           </span>
-          <Show when={props.usage && !props.usage.persisted && keepVerdict() === null}>
-            <button
-              type="button"
-              class="storage-keep-inline"
-              onClick={() => void props.onKeep().then(setKeepVerdict)}
-            >
-              Ask the browser to keep it
-            </button>
-          </Show>
         </div>
         <span class="storage-status-track" aria-hidden="true">
           <span class="storage-status-fill" style={{ width: `${usagePercent(props.usage)}%` }} />
         </span>
-        {/*
-          What the browser said, in its own terms. Chromium answers this from its heuristics
-          and never prompts, so "nothing happened" would be the whole story unless it is said
-          here — and once the answer is known the button goes, because asking twice cannot
-          change it.
-        */}
-        <Show when={keepVerdict() !== null || props.usage?.persisted}>
-          <p class="storage-status-note">
-            {props.usage?.persisted
-              ? "This browser will keep these files until you delete them."
-              : keepVerdict() === "granted"
-                ? "Granted. These files will be kept until you delete them."
-                : keepVerdict() === "unsupported"
-                  ? "This browser does not let a page ask, so these files are best-effort."
-                  : "The browser declined, and it decides for itself: it grants this to installed apps and to sites used often, with no prompt to accept. Until then these files are best-effort — the browser may drop them when the device runs short of space."}
-          </p>
-        </Show>
       </section>
 
       <Show when={props.error}>{(message) => <p class="storage-error" role="alert">{message()}</p>}</Show>
 
       <section class="storage-tree" aria-label="Stored files">
-        <div class="storage-files-head">
-          <span>Stored files</span>
-          <Show when={props.files.length > 0}>
-            <span class="storage-files-total">
-              {treeFiles()} file{treeFiles() === 1 ? "" : "s"} · {formatBytes(treeBytes())}
-            </span>
-          </Show>
-        </div>
-
         <Show
           when={tree().length > 0}
           fallback={

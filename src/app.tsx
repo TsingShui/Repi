@@ -330,7 +330,6 @@ function MainApp() {
         onClose={() => setStorageDialogOpen(false)}
         onDeleteFile={(id) => conversations.removeFile(id)}
         onDeleteAll={() => conversations.removeAllFiles()}
-        onKeep={() => conversations.keepStorage()}
       />
 
       <ProviderDialog

@@ -467,6 +467,24 @@ export function createWorkspaceStorage() {
     await writeCompleted;
   };
 
+  /**
+   * Asks the browser to keep this origin's storage, once, when a file is first saved.
+   *
+   * Nothing is reported here because nothing a page says changes the answer: Chromium decides
+   * from its own heuristics and never prompts, while Firefox does prompt — and the moment
+   * someone hands over a binary is the moment the question means something. What the panel
+   * shows is the resulting state (`best effort` or `persistent`), which is a fact; the button
+   * that used to sit there pretending to prompt was removed because it could not change it.
+   */
+  const requestPersistence = async (): Promise<void> => {
+    try {
+      await navigator.storage?.persist?.();
+    } catch {
+      // A browser that refuses to answer is a browser whose storage stays best-effort, which
+      // the panel already says.
+    }
+  };
+
   const listProviders = async (): Promise<readonly ModelProvider[]> => {
     const db = await database;
     const transaction = db.transaction(PROVIDERS, "readonly");
@@ -533,23 +551,6 @@ export function createWorkspaceStorage() {
       persisted,
       backend: opfsAvailable() ? "opfs" : "indexeddb",
     };
-  };
-
-  /**
-   * Asks the browser to keep this origin's storage.
-   *
-   * The answer is reported rather than swallowed, because it is not something a page can
-   * influence: Chromium resolves this immediately from its own heuristics (an installed app,
-   * and how much the site is used) and never shows a prompt, while Firefox does ask. A button
-   * that looks like a prompt and silently does nothing is worse than no button.
-   */
-  const requestPersistence = async (): Promise<"granted" | "denied" | "unsupported"> => {
-    if (typeof navigator.storage?.persist !== "function") return "unsupported";
-    try {
-      return (await navigator.storage.persist()) ? "granted" : "denied";
-    } catch {
-      return "denied";
-    }
   };
 
   return {

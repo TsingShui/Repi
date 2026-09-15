@@ -138,17 +138,6 @@
   background: var(--danger);
 }
 
-.storage-keep-inline {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
 
 .storage-chip {
   border-radius: var(--r-pill);
@@ -166,9 +155,6 @@
 
 /* ========================================================== cached files */
 
-.storage-files {
-  margin-top: 24px;
-}
 
 .storage-files-head {
   align-items: baseline;
@@ -196,28 +182,8 @@
   line-height: 1.55;
 }
 
-.storage-file-list {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 
-.storage-file {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 36px;
-  align-items: center;
-  gap: 11px;
-  padding: 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--canvas-raised);
-}
 
-.storage-file[data-busy="true"] {
-  opacity: 0.55;
-}
 
 .storage-file-icon {
   display: grid;
@@ -245,15 +211,6 @@
   overflow: hidden;
   font-size: 13px;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.storage-file-facts,
-.storage-file-origin {
-  overflow: hidden;
-  color: var(--ink-faint);
-  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -348,7 +305,6 @@
     border-radius: var(--r-md);
   }
 
-  .storage-keep,
   .storage-dialog-foot {
     flex-direction: column;
     align-items: stretch;
@@ -369,7 +325,15 @@
  */
 .storage-tree {
   display: grid;
-  gap: 9px;
+  gap: 2px;
+  margin-top: 14px;
+}
+
+/* A size is the reason the tree exists; a narrow window drops the date, not the number. */
+@media (max-width: 540px) {
+  .storage-tree-meta {
+    font-size: 10px;
+  }
 }
 
 .storage-tree-root,
@@ -383,11 +347,13 @@
 
 .storage-tree-row {
   display: grid;
-  grid-template-columns: 18px 26px minmax(0, 1fr) 32px;
+  /* chevron, icon, name, metadata, delete — metadata right-aligned, the way a file list reads. */
+  grid-template-columns: 18px 26px minmax(0, 1fr) auto 26px;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 9px;
+  min-height: 38px;
+  padding: 6px 9px;
   border: 0;
   border-radius: var(--r-sm);
   background: none;
@@ -435,10 +401,32 @@
   color: var(--ink);
 }
 
-.storage-tree-row .storage-file-copy {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
+/*
+ * Icons, and the delete button, at the folder's size.
+ *
+ * The old list sized its rows for a 36px icon and a 36px button; carrying those into a tree
+ * made every file row eight pixels taller than every folder row, which reads as a broken
+ * list rather than a hierarchy.
+ */
+.storage-tree-row .storage-file-icon,
+.storage-tree-row .storage-file-delete {
+  width: 26px;
+  height: 26px;
+  background: none;
+}
+
+.storage-tree-row .storage-file-delete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.storage-tree-row .storage-file-icon {
+  background: none;
+}
+
+.storage-tree-row .storage-file-icon svg {
+  width: 15px;
+  height: 15px;
 }
 
 .storage-tree-row .storage-file-name {
@@ -447,28 +435,12 @@
   white-space: nowrap;
 }
 
-.storage-tree-row .storage-file-facts {
-  font-size: 0.8em;
-  color: var(--ink-muted);
-}
-
-.storage-tree-children {
-  position: relative;
-}
-
-.storage-tree-children::before {
-  /* One hairline per level, so the nesting is visible without a box per folder. */
-  content: "";
-  position: absolute;
-  inset: 2px auto 2px 0;
-  left: calc(12px + (var(--tree-depth, 0) * 16px));
-  width: 1px;
-  background: var(--line);
-}
-
-.storage-status-note {
-  margin-top: 9px;
+.storage-tree-meta {
   color: var(--ink-faint);
-  font-size: 12px;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+
+
