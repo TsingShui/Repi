@@ -38,6 +38,15 @@ function messageFor(error: unknown): string {
 export function createDeviceStore() {
   const connector = createWebUsbAdbConnector();
   const [status, setStatus] = createSignal<DeviceStatus>(connector ? "idle" : "unsupported");
+  /**
+   * What to say when nothing happened.
+   *
+   * Closing Chrome's USB picker, and opening it when no device advertises an ADB interface,
+   * are the same event from the page's side — the library reports both as "no device" — and
+   * both used to leave the dialog exactly as it was. A click that changes nothing is
+   * indistinguishable from a broken button, so the checklist is said out loud.
+   */
+  const [notice, setNotice] = createSignal<string | null>(null);
   const [available, setAvailable] = createSignal<readonly AndroidUsbDevice[]>([]);
   const [device, setDevice] = createSignal<AndroidDeviceInfo | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -99,13 +108,22 @@ export function createDeviceStore() {
     if (!connector || status() === "connecting") return;
     setStatus("connecting");
     setError(null);
+    setNotice(null);
 
     try {
       // No await happens before this request. Chromium requires the WebUSB picker to
       // originate in the click that called this function.
       const selected = await connector.requestDevice();
       if (!selected) {
-        if (!disposed) setStatus("idle");
+        if (!disposed) {
+          setStatus("idle");
+          setNotice(
+            "No device was chosen. If the list was empty, the phone is not offering an ADB " +
+              "interface yet: turn on USB debugging, set the USB mode to file transfer or PTP " +
+              "(not “charging only”), and keep the phone plugged into the machine running this " +
+              "browser — a device handed to WSL or to usbipd is not visible to a Windows Chrome.",
+          );
+        }
         return;
       }
       // `connect` guards against a second click while connecting. The picker itself
@@ -144,6 +162,7 @@ export function createDeviceStore() {
     available,
     device,
     error,
+    notice,
     sidebar,
     refresh,
     connect,

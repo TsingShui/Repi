@@ -382,3 +382,23 @@
     display: none;
   }
 }
+
+/*
+ * What the two waits look like: the picker and the phone.
+ *
+ * A click that opens Chrome's picker and a click that opens an empty one are the same event
+ * from here, so the difference is said in words rather than shown by a spinner that stops.
+ */
+.device-waiting,
+.device-notice-line {
+  margin-top: 10px;
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.device-notice-line {
+  border-left-color: var(--working);
+}

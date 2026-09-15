@@ -9,6 +9,8 @@ export interface DeviceDialogProps {
   readonly available: readonly AndroidUsbDevice[];
   readonly device: AndroidDeviceInfo | null;
   readonly error: string | null;
+  /** What to say when the picker was closed or came up empty. Not a failure: a fact. */
+  readonly notice: string | null;
   readonly onClose: () => void;
   readonly onRefresh: () => Promise<void>;
   readonly onConnect: (id: string) => Promise<void>;
@@ -138,9 +140,25 @@ export function DeviceDialog(props: DeviceDialogProps) {
               {busy() ? "Waiting for device…" : "Connect an Android device"}
             </button>
 
+            <Show when={props.status === "connecting"}>
+              <p class="device-waiting" role="status">
+                Waiting for the picker, then for the phone: Android will ask you to
+                <strong> Allow USB debugging</strong> — accept it on the device.
+              </p>
+            </Show>
+
+            <Show when={props.notice}>
+              {(message) => (
+                <p class="device-notice-line" role="status">
+                  {message()}
+                </p>
+              )}
+            </Show>
+
             <p class="device-help">
               Repi opens Chrome’s USB picker, then Android asks you to authorize its ADB key. A direct
-              USB connection may require desktop <code>adb</code> to release the phone first.
+              USB connection may require desktop <code>adb</code> to release the phone first, and the
+              picker only lists a phone that is offering an ADB interface.
             </p>
           </section>
         </Show>

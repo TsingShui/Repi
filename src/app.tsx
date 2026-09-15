@@ -314,6 +314,7 @@ function MainApp() {
         available={devices.available()}
         device={devices.device()}
         error={devices.error()}
+        notice={devices.notice()}
         onClose={() => setDeviceDialogOpen(false)}
         onRefresh={() => devices.refresh()}
         onConnect={(id) => devices.connect(id)}

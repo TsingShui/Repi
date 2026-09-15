@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
-  "description": "Repi — browser-local reverse-engineering workspace for tablets.",
+  "description": "Repi \u2014 browser-local reverse-engineering workspace for tablets.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node ./scripts/ship-licence.mjs",
@@ -13,7 +13,8 @@
     "build:rasc": "node ./scripts/build-rasc.mjs",
     "check:sandbox": "node ./scripts/run-analysis-check.mjs sandbox-check",
     "check:detect": "node ./scripts/run-analysis-check.mjs detect-check",
-    "check:kuna": "node ./scripts/run-analysis-check.mjs kuna-check"
+    "check:kuna": "node ./scripts/run-analysis-check.mjs kuna-check",
+    "check:device": "node ./scripts/device-check.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",

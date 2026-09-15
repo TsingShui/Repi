@@ -49,10 +49,20 @@ function candidateId(device: AdbDaemonWebUsbDevice, index: number): string {
 }
 
 function candidate(device: AdbDaemonWebUsbDevice, index: number): AndroidUsbDevice {
+  /*
+   * `name` is the USB product string, and a phone is free to leave it empty, call itself
+   * "Android", or answer with its serial — which then looks like a name in a list. The name
+   * Android actually reports (`ro.product.manufacturer` + `ro.product.model`) only exists once
+   * ADB is up, so until then the honest answer is a placeholder with the serial beside it,
+   * not a serial wearing a name's clothes.
+   */
+  const product = (device.name ?? "").trim();
+  const serial = (device.serial ?? "").trim();
+  const named = product !== "" && product !== serial && !/^android$/i.test(product);
   return {
     id: candidateId(device, index),
-    name: device.name || "Android device",
-    serial: device.serial,
+    name: named ? product : "Android device",
+    serial,
   };
 }
 
