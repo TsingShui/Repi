@@ -2,7 +2,7 @@ import { For, Show } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
 import type { DeviceSidebarState } from "../devices/device-store";
 import type { StorageUsage } from "../../lib/storage/workspace-storage";
-import { usageLevel, usageNote, usagePercent, usageSentence, usageValue } from "../storage/usage";
+import { usageLevel, usagePercent, usageSentence } from "../storage/usage";
 import type { Conversation } from "./types";
 import "./conversation-sidebar.css";
 
@@ -127,7 +127,14 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
           type="button"
           data-level={usageLevel(props.usage)}
           data-error={props.storageError ? "true" : "false"}
+          /*
+           * The row is an icon and a bar: a number beside a bar that already shows the
+           * proportion is noise in a sidebar, and the sentence it replaced was longer than the
+           * thing it described. The numbers are still here for anyone who asks for them —
+           * as the accessible name, and as the tooltip.
+           */
           aria-label={usageSentence(props.usage, props.storageError)}
+          title={usageSentence(props.usage, props.storageError)}
           onClick={props.onOpenStorage}
         >
           <span class="storage-meter-head">
@@ -139,13 +146,11 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
             <span class="storage-meter-track" aria-hidden="true">
               <span class="storage-meter-fill" style={{ width: `${usagePercent(props.usage)}%` }} />
             </span>
-            <Show when={usageValue(props.usage)}>
-              {(value) => <small class="storage-meter-value">{value()}</small>}
-            </Show>
           </span>
-          <small class="storage-meter-note" title={props.storageError ?? usageNote(props.usage)}>
-            {props.storageError ?? usageNote(props.usage)}
-          </small>
+          {/* Only a failure earns a line: "best effort, 32 KB of 10 GB" does not. */}
+          <Show when={props.storageError}>
+            {(message) => <small class="storage-meter-note">{message()}</small>}
+          </Show>
         </button>
 
         <button

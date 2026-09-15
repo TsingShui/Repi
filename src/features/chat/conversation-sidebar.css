@@ -216,12 +216,6 @@
 }
 
 /* The number ends the row: the bar is proportion, the number is the amount. */
-.storage-meter-value {
-  flex: none;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
 
 /*
  * The bar rides the row the label is on instead of taking one of its own. In a rail
