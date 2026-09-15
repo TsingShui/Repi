@@ -125,6 +125,18 @@
   min-width: 0;
 }
 
+/* Match the conversation rail's brand origin exactly, so moving to About does
+ * not make the mark jump: 12px rail inset + 8px head inset, 18px top inset. */
+.about-top-bar {
+  min-height: 64px;
+  padding: max(18px, env(safe-area-inset-top)) 20px 10px;
+  align-items: flex-start;
+}
+
+.about-top-bar .top-bar-group {
+  min-height: 36px;
+}
+
 /*
  * An ink tile with the page's colour for the glyph: black and white, in both themes.
  * It is also the mark beside anything the application says in the conversation, so
@@ -187,6 +199,21 @@
   padding: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.top-bar-agent-back {
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--r-xs);
+  padding: 0 4px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.top-bar-agent-back:hover {
+  color: var(--ink);
 }
 
 .top-bar-sep {

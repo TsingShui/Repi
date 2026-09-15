@@ -15,8 +15,8 @@ deletes conversations; each one stores its transcript in IndexedDB and takes its
 title from the first message or file. Attached binaries are streamed into OPFS,
 with an IndexedDB `Blob` fallback where OPFS is unavailable. The conversation itself is a wide centred
 column, a transcript, and a capsule composer. The layout is the one the assistant
-surfaces have settled on — a greeting over the composer when nothing has been said,
-a composer that docks to the bottom once there is a transcript — because a
+surfaces have settled on — a rotating investigation prompt over the composer when
+nothing has been said, a composer that docks to the bottom once there is a transcript — because a
 conversation that looks like the ones people already use is one they do not have
 to learn. The conversation borrows a quiet, persistent version of About's structure
 field: dimmer, slower, without fragments or pointer parallax, and masked beneath the
@@ -84,10 +84,11 @@ the model request. The full Pi Coding Agent shell is not embedded because its fi
 process and terminal runtime is Node-specific and would break the browser-only trust
 boundary.
 
-The empty state is the greeting and the composer, and nothing else. An earlier
-version of this page explained itself under both — what runs where, and that no
-model is connected — and the copy was removed: the greeting asks the question the
-product is for, and the composer is the answer to it.
+The empty state has a restrained hierarchy rather than one fixed sentence: one of
+four slowly rotating investigation questions, one sentence about the device boundary,
+the composer, and three prompts that fill — but do not submit — the composer. Rotation
+stops under `prefers-reduced-motion`; the stable screen-reader heading names the surface
+without announcing every decorative change.
 
 That leaves the interface saying nothing about where a file goes. It is recorded here
 because this document argued the other way — that the claim is the product's point and

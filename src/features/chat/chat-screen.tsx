@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Markdown } from "../../components/markdown";
 import { formatBytes, type EngineId } from "../../lib/detect-format";
 import { StructureField } from "../about/structure-field";
@@ -26,6 +26,20 @@ export interface ChatScreenProps {
 
 /** Spelled out, so a third engine is a type error rather than a silent "undefined". */
 const ENGINE_NAMES: Record<EngineId, string> = { kuna: "Kuna", rasc: "Rasc" };
+
+const GREETINGS = [
+  { lead: "What are we", focus: "looking at?" },
+  { lead: "Where does execution", focus: "begin?" },
+  { lead: "What deserves a", focus: "closer look?" },
+  { lead: "What is hiding", focus: "in here?" },
+  { lead: "Emmmm,", focus: "Capture The Flag?" },
+] as const;
+
+const STARTER_PROMPTS = [
+  "Summarize this binary",
+  "Find suspicious strings",
+  "Trace the entry point",
+] as const;
 
 /**
  * Whether anything in this build can read the file, said as a sentence.
@@ -75,10 +89,59 @@ function FileInput(props: {
  */
 export function ChatScreen(props: ChatScreenProps) {
   const [text, setText] = createSignal("");
+  const [greetingIndex, setGreetingIndex] = createSignal(
+    Math.floor(Math.random() * GREETINGS.length),
+  );
+  const [greetingPhase, setGreetingPhase] = createSignal<"visible" | "out" | "in">("visible");
   let scroller: HTMLDivElement | undefined;
   let input: HTMLTextAreaElement | undefined;
 
   const empty = () => props.lines.length === 0;
+  const greeting = () => GREETINGS[greetingIndex()]!;
+
+  let greetingTimer: number | undefined;
+  let greetingSwapTimer: number | undefined;
+  let greetingFrame = 0;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const stopGreetingCycle = () => {
+    if (greetingTimer !== undefined) window.clearInterval(greetingTimer);
+    if (greetingSwapTimer !== undefined) window.clearTimeout(greetingSwapTimer);
+    window.cancelAnimationFrame(greetingFrame);
+    greetingTimer = undefined;
+    greetingSwapTimer = undefined;
+    greetingFrame = 0;
+  };
+
+  const finishGreetingExit = () => {
+    if (greetingPhase() !== "out") return;
+    if (greetingSwapTimer !== undefined) window.clearTimeout(greetingSwapTimer);
+    greetingSwapTimer = undefined;
+
+    // The old words are fully transparent now. Swap while hidden, put the new
+    // words at their entrance position, then reveal them on the following frame.
+    setGreetingIndex((current) => (current + 1) % GREETINGS.length);
+    setGreetingPhase("in");
+    greetingFrame = window.requestAnimationFrame(() => {
+      greetingFrame = window.requestAnimationFrame(() => setGreetingPhase("visible"));
+    });
+  };
+
+  const cycleGreeting = () => {
+    // Keep the old words in place while they leave. `transitionend` performs the
+    // swap; this timeout is only a fallback if the browser suppresses that event.
+    setGreetingPhase("out");
+    greetingSwapTimer = window.setTimeout(finishGreetingExit, 320);
+  };
+
+  createEffect(empty, (isEmpty) => {
+    stopGreetingCycle();
+    setGreetingPhase("visible");
+    if (isEmpty && !reducedMotion) {
+      greetingTimer = window.setInterval(cycleGreeting, 4800);
+    }
+  });
+  onCleanup(stopGreetingCycle);
 
   /*
    * Follow the end of the transcript. Unconditionally for now: a transcript this
@@ -115,6 +178,14 @@ export function ChatScreen(props: ChatScreenProps) {
     input.style.height = `${Math.min(input.scrollHeight, 200)}px`;
   };
 
+  const chooseStarter = (prompt: string) => {
+    setText(prompt);
+    queueMicrotask(() => {
+      grow();
+      input?.focus();
+    });
+  };
+
   const submit = () => {
     const value = text().trim();
     if (!value || !canSend()) return;
@@ -149,9 +220,21 @@ export function ChatScreen(props: ChatScreenProps) {
           <div class="chat-column" role="log" aria-live="polite" data-testid="transcript">
             <Show when={empty()}>
               <section class="chat-welcome">
-                <h1 class="chat-greeting">
-                  What are we <em>looking at</em>?
-                </h1>
+                <h1 class="visually-hidden">Explore a binary with Repi</h1>
+                <p class="chat-greeting" aria-hidden="true">
+                  <span
+                    class="chat-greeting-cycle"
+                    data-phase={greetingPhase()}
+                    onTransitionEnd={(event) => {
+                      if (event.propertyName === "opacity") finishGreetingExit();
+                    }}
+                  >
+                    {greeting().lead} <em>{greeting().focus}</em>
+                  </span>
+                </p>
+                <p class="chat-welcome-copy">
+                  Drop a binary, then ask in plain language. Analysis stays on this device.
+                </p>
               </section>
             </Show>
 
@@ -321,6 +404,20 @@ export function ChatScreen(props: ChatScreenProps) {
               </div>
             </div>
           </form>
+          <Show when={empty()}>
+            <div class="starter-prompts" aria-label="Things to ask">
+              <For each={STARTER_PROMPTS}>
+                {(prompt) => (
+                  <button type="button" onClick={() => chooseStarter(prompt)}>
+                    <span>{prompt}</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 17L17 7M9 7h8v8" />
+                    </svg>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
     </main>
   );

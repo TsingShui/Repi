@@ -57,21 +57,52 @@
 }
 
 .chat[data-empty="true"] .chat-column {
-  padding-block: 0 28px;
+  padding-block: 0 24px;
 }
 
 /* ============================================================== greeting */
 
+.chat-welcome {
+  position: relative;
+  max-width: 680px;
+}
+
 .chat-greeting {
-  font-size: clamp(28px, 4.2vw, 38px);
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  min-height: 1.14em;
+  font-size: clamp(31px, 5vw, 46px);
+  font-weight: 430;
+  letter-spacing: -0.035em;
   line-height: 1.14;
+}
+
+.chat-greeting-cycle {
+  display: inline-block;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.chat-greeting-cycle[data-phase="out"] {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.chat-greeting-cycle[data-phase="in"] {
+  opacity: 0;
+  transform: translateY(7px);
 }
 
 .chat-greeting em {
   font-style: normal;
   color: var(--accent);
+}
+
+.chat-welcome-copy {
+  max-width: 55ch;
+  margin-top: 13px;
+  color: var(--ink-muted);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 /* ========================================================== transcript */
@@ -472,8 +503,8 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
 .composer-column {
   position: relative;
   z-index: 1;
-  padding-block: 12px calc(12px + env(safe-area-inset-bottom));
-  background: var(--canvas);
+  padding-block: 4px calc(12px + env(safe-area-inset-bottom));
+  background: transparent;
 }
 
 /* Once the transcript is active, keep the composer clear of the viewport edge.
@@ -515,18 +546,46 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
 }
 
 .composer-box {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: visible;
   padding: 6px;
   border: 1px solid var(--line);
   border-radius: var(--r-capsule);
-  background: var(--canvas-raised);
+  background:
+    linear-gradient(145deg, rgb(var(--canvas-rgb) / 78%), transparent 44%),
+    var(--canvas-raised);
   box-shadow: var(--shadow-composer);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.composer-box::before {
+  position: absolute;
+  top: 0;
+  right: 36px;
+  left: 36px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 72%), transparent);
+  content: "";
+  pointer-events: none;
 }
 
 .composer-box:focus-within {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  box-shadow:
+    var(--shadow-composer),
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.chat[data-empty="true"] .composer-box {
+  background:
+    linear-gradient(145deg, rgb(var(--canvas-rgb) / 92%), rgb(var(--canvas-rgb) / 42%)),
+    var(--canvas-raised);
+  box-shadow:
+    0 1px 3px rgb(60 64 67 / 8%),
+    0 16px 46px rgb(60 64 67 / 10%);
 }
 
 .composer-actions {
@@ -625,4 +684,71 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
 
 .composer-input::placeholder {
   color: var(--ink-faint);
+}
+
+/* Suggested investigations make the empty state useful without pretending the
+ * agent has inspected a file already. A click only fills the composer. */
+.starter-prompts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.starter-prompts button {
+  display: flex;
+  min-width: 0;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: var(--r-sm);
+  padding: 8px 10px 8px 13px;
+  background: rgb(var(--canvas-rgb) / 70%);
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  text-align: left;
+  backdrop-filter: blur(8px);
+  transition: border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.starter-prompts button:hover {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.starter-prompts span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starter-prompts svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 620px) {
+  .starter-prompts {
+    grid-template-columns: 1fr;
+  }
+
+  .starter-prompts button {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-greeting-cycle {
+    transition: none;
+  }
 }

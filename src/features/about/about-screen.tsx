@@ -75,12 +75,14 @@ export function AboutScreen(props: AboutScreenProps) {
       */}
       <StructureField />
 
-      <header class="top-bar">
+      <header class="top-bar about-top-bar">
         <div class="top-bar-group">
           <button class="top-bar-back" type="button" onClick={props.onClose} aria-label="Back to home">
             <BrandMark />
           </button>
-          <span class="brand-name">Repi</span>
+          <button class="top-bar-agent-back" type="button" onClick={props.onClose}>
+            Back to Agent
+          </button>
           <span class="top-bar-sep" aria-hidden="true">
             |
           </span>
