@@ -10,10 +10,14 @@ What is in the repository today is the part of the old build that survives:
 - the conversation, which is the home surface: a chat shell with browser-local
   history and configurable OpenAI-compatible providers. Conversation and provider
   records live in IndexedDB; attached binaries live in OPFS where available, with
-  an IndexedDB `Blob` fallback;
+  a separate IndexedDB blob store as the fallback, and the rail's storage meter opens
+  a panel that lists what is cached and deletes individual copies;
 - the Pi Agent loop, connected to user-configured OpenAI-compatible providers. It
   discovers their model catalogs through `/models` and can call bounded, read-only
   tools over the locally stored binary; only textual tool results enter the model request;
+- direct WebUSB ADB connection for a locally attached Android phone: browser-stored
+  ADB credentials, Android authorization, device facts and a root-capability probe all
+  stay local; Frida sessions are the next layer, not yet wired into the Agent;
 - the file intake (picker, drop, attach, local format detection);
 - the two engines as **analysers** — Kuna for native binaries, Rasc for APK and
   DEX, both compiled to WebAssembly and run on the device — with their Worker
@@ -39,6 +43,7 @@ installed by `pi install`.
 | Build | Vite 8 with `vite-plugin-solid` |
 | Language | TypeScript, `strict` |
 | Styling | Plain CSS with custom-property tokens, light theme first |
+| Device transport | Tango / Ya-WebADB over direct Chromium WebUSB |
 | Routing | A hash route for `/#/about`, and nothing else yet |
 
 Everything is pinned in `package-lock.json`.
@@ -50,7 +55,9 @@ npm install
 npm run dev
 ```
 
-Vite serves on <http://127.0.0.1:5173>.
+Vite serves on <http://127.0.0.1:5173>. WebUSB works only in Chromium browsers on
+`localhost` or HTTPS. Enable USB debugging on the Android phone; for a direct WebUSB
+connection, desktop `adb` may need to release the phone's ADB interface first.
 
 ## Build
 
@@ -84,6 +91,8 @@ src/
   components/brand-mark.tsx
   features/chat/                transcript, composer, and browser-local conversation history
   features/models/              provider setup and per-conversation model selection
+  features/devices/             left-rail Android device manager and its dialog
+  features/storage/             the capacity meter's wording, and the cache panel
   features/about/               what Repi is, and the other half's install command
   features/about/structure-field.tsx  full-screen canvas backdrop
   features/about/               what Repi is, what it is built on, the install command
@@ -91,6 +100,7 @@ src/
   lib/detect-format.ts          local format detection, header plus ZIP directory
   lib/storage/                  IndexedDB records and OPFS-backed binary storage
   lib/agent/                    Pi Agent runtime and local reverse-engineering tools
+  lib/device/                   direct WebUSB ADB adapter; protocol details stay here
   lib/sha256.ts                 streaming digest, so a large file is never held
   lib/pointer.ts                fine or coarse pointer, read once
   lib/analysis/types.ts         the contract an engine implements

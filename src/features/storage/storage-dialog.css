@@ -1,0 +1,372 @@
+.storage-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+  margin: auto;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: var(--panel-lift);
+}
+
+.storage-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+}
+
+.storage-dialog-head,
+.storage-summary-figures,
+.storage-files-head,
+.storage-dialog-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.storage-dialog-head h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.storage-dialog-head p {
+  margin-top: 4px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.storage-dialog-close {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-xs);
+  padding: 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.storage-dialog-close:hover {
+  background: var(--canvas-raised);
+  color: var(--ink);
+}
+
+.storage-dialog-close svg,
+.storage-file-icon svg,
+.storage-file-delete svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.storage-dialog-close svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+
+/* ========================================================== capacity */
+
+.storage-summary {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--canvas-raised);
+}
+
+.storage-summary-figures {
+  align-items: baseline;
+}
+
+.storage-summary-figures strong {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.storage-summary-figures span {
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.storage-summary-track {
+  display: block;
+  height: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--canvas);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.storage-summary-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--local);
+  transition: width 240ms ease;
+}
+
+.storage-summary[data-level="working"] .storage-summary-fill {
+  background: var(--working);
+}
+
+.storage-summary[data-level="danger"] .storage-summary-fill {
+  background: var(--danger);
+}
+
+.storage-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.storage-chip {
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.storage-chip[data-retention="persistent"] {
+  background: var(--local-soft);
+  color: var(--local);
+}
+
+.storage-keep {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.storage-keep p {
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.storage-keep button {
+  flex: none;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 0 13px;
+  background: var(--canvas);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.storage-keep button:hover {
+  background: var(--accent-soft);
+}
+
+/* ========================================================== cached files */
+
+.storage-files {
+  margin-top: 24px;
+}
+
+.storage-files-head {
+  align-items: baseline;
+  margin-bottom: 8px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.storage-files-total {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.storage-empty {
+  padding: 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.storage-file-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storage-file {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--canvas-raised);
+}
+
+.storage-file[data-busy="true"] {
+  opacity: 0.55;
+}
+
+.storage-file-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+  color: var(--ink-muted);
+}
+
+.storage-file-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.6;
+}
+
+.storage-file-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.storage-file-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-file-facts,
+.storage-file-origin {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-file-facts {
+  font-family: var(--font-mono);
+}
+
+.storage-file-delete {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink-faint);
+}
+
+.storage-file-delete svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.6;
+}
+
+.storage-file-delete:hover {
+  background: var(--canvas);
+  color: var(--danger);
+}
+
+.storage-file-delete:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+/* Nothing to clear is a resting state, not work in progress. */
+.storage-remove-all:disabled {
+  opacity: 0.5;
+}
+
+/* ========================================================== foot */
+
+.storage-dialog-foot {
+  align-items: center;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.storage-dialog-foot p {
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.storage-remove-all {
+  flex: none;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 0 14px;
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.storage-remove-all:hover {
+  border-color: var(--line-strong);
+  color: var(--danger);
+}
+
+.storage-remove-all[data-confirming="true"] {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--canvas);
+}
+
+.storage-error {
+  margin-top: 16px;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 540px) {
+  .storage-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 20px;
+    border-radius: var(--r-md);
+  }
+
+  .storage-keep,
+  .storage-dialog-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .storage-file-facts {
+    display: none;
+  }
+}

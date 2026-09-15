@@ -69,6 +69,8 @@
 .new-conversation svg,
 .sidebar-close svg,
 .conversation-delete svg,
+.storage-meter svg,
+.sidebar-device svg,
 .sidebar-model svg,
 .sidebar-about svg {
   width: 18px;
@@ -169,33 +171,117 @@
   color: var(--danger);
 }
 
-.storage-status {
+/*
+ * The one row in this stack that shows a quantity rather than a state: what the
+ * browser is holding, how full that is, and where the bytes live. The whole row is
+ * the way into the panel that lists what is cached, so it is a control, not a label.
+ */
+.storage-meter {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  margin: auto 0 2px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  text-align: left;
+}
+
+.storage-meter:hover {
+  background: var(--canvas-raised);
+}
+
+.storage-meter-head {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: auto 10px 6px;
-  color: var(--ink-faint);
-  font-size: 11px;
-  line-height: 1.35;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
 }
 
-.storage-status[data-error="true"] {
-  color: var(--danger);
-}
-
-.storage-dot {
+.storage-meter-head svg {
   flex: none;
-  width: 7px;
-  height: 7px;
-  margin-top: 4px;
-  border-radius: 50%;
-  background: var(--local);
 }
 
-.storage-status[data-error="true"] .storage-dot {
+.storage-meter-head > span {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The number sits with the words rather than over the bar: the bar is proportion. */
+.storage-meter-value {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.storage-meter-track {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--line);
+}
+
+.storage-meter-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--local);
+  transition: width 240ms ease;
+}
+
+.storage-meter[data-level="working"] .storage-meter-fill {
+  background: var(--working);
+}
+
+.storage-meter[data-level="danger"] .storage-meter-fill {
   background: var(--danger);
 }
 
+.storage-meter-note {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-meter[data-error="true"] .storage-meter-note {
+  color: var(--danger);
+}
+
+.sidebar-device-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.sidebar-device-copy > span {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-device-copy small {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-device,
 .sidebar-model,
 .sidebar-about {
   display: flex;
@@ -210,6 +296,7 @@
   text-decoration: none;
 }
 
+.sidebar-device,
 .sidebar-model {
   width: 100%;
   border: 0;
@@ -217,6 +304,32 @@
   text-align: left;
 }
 
+.sidebar-device {
+  min-height: 52px;
+}
+
+.sidebar-device-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.sidebar-device[data-status="connected"] .sidebar-device-dot {
+  background: var(--local);
+}
+
+.sidebar-device[data-status="connecting"] .sidebar-device-dot {
+  background: var(--working);
+}
+
+.sidebar-device[data-status="error"] .sidebar-device-dot {
+  background: var(--danger);
+}
+
+.sidebar-device:hover,
 .sidebar-model:hover,
 .sidebar-about:hover {
   background: var(--canvas-raised);

@@ -1,7 +1,8 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import { BrandMark } from "../../components/brand-mark";
-import { formatBytes } from "../../lib/detect-format";
+import type { DeviceSidebarState } from "../devices/device-store";
 import type { StorageUsage } from "../../lib/storage/workspace-storage";
+import { usageLevel, usageNote, usagePercent, usageSentence, usageValue } from "../storage/usage";
 import type { Conversation } from "./types";
 import "./conversation-sidebar.css";
 
@@ -12,19 +13,29 @@ export interface ConversationSidebarProps {
   readonly ready: boolean;
   readonly storageError: string | null;
   readonly usage: StorageUsage | null;
+  readonly device: DeviceSidebarState;
   readonly onNew: () => void;
   readonly onSelect: (id: string) => void;
   readonly onDelete: (id: string) => void;
   readonly onAddProvider: () => void;
+  readonly onOpenDevice: () => void;
+  readonly onOpenStorage: () => void;
   readonly onClose: () => void;
 }
 
-function usageLabel(usage: StorageUsage | null): string {
-  if (!usage) return "Checking local storage…";
-  const backend = usage.backend === "opfs" ? "OPFS" : "IndexedDB";
-  const retention = usage.persisted ? "persistent" : "best effort";
-  if (usage.usage === null || usage.quota === null) return `${backend} · ${retention}`;
-  return `${formatBytes(usage.usage)} of ${formatBytes(usage.quota)} · ${backend} · ${retention}`;
+function deviceLabel(device: DeviceSidebarState): string {
+  switch (device.status) {
+    case "connected":
+      return device.name ?? "Connected";
+    case "connecting":
+      return "Connecting…";
+    case "unsupported":
+      return "WebUSB unavailable";
+    case "error":
+      return "Reconnect device";
+    default:
+      return "Connect Android";
+  }
 }
 
 function relativeDate(timestamp: number): string {
@@ -111,10 +122,48 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
           </div>
         </div>
 
-        <div class="storage-status" data-error={props.storageError ? "true" : "false"}>
-          <span class="storage-dot" aria-hidden="true" />
-          <span>{props.storageError ?? usageLabel(props.usage)}</span>
-        </div>
+        <button
+          class="storage-meter"
+          type="button"
+          data-level={usageLevel(props.usage)}
+          data-error={props.storageError ? "true" : "false"}
+          aria-label={usageSentence(props.usage, props.storageError)}
+          onClick={props.onOpenStorage}
+        >
+          <span class="storage-meter-head">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <ellipse cx="12" cy="5" rx="7" ry="3" />
+              <path d="M5 5v10c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10c0 1.7 3.1 3 7 3s7-1.3 7-3" />
+            </svg>
+            <span>Storage</span>
+            <Show when={usageValue(props.usage)}>
+              {(value) => <small class="storage-meter-value">{value()}</small>}
+            </Show>
+          </span>
+          <span class="storage-meter-track" aria-hidden="true">
+            <span class="storage-meter-fill" style={{ width: `${usagePercent(props.usage)}%` }} />
+          </span>
+          <small class="storage-meter-note" title={props.storageError ?? usageNote(props.usage)}>
+            {props.storageError ?? usageNote(props.usage)}
+          </small>
+        </button>
+
+        <button
+          class="sidebar-device"
+          type="button"
+          data-status={props.device.status}
+          onClick={props.onOpenDevice}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="3" width="10" height="18" rx="2" />
+            <path d="M10 6h4M11.5 18h1" />
+          </svg>
+          <span class="sidebar-device-copy">
+            <span>Device</span>
+            <small>{deviceLabel(props.device)}</small>
+          </span>
+          <span class="sidebar-device-dot" aria-hidden="true" />
+        </button>
 
         <button class="sidebar-model" type="button" onClick={props.onAddProvider}>
           <svg viewBox="0 0 24 24" aria-hidden="true">

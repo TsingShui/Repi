@@ -6,8 +6,11 @@ import { AboutScreen } from "./features/about/about-screen";
 import { ChatScreen, type ChatLine } from "./features/chat/chat-screen";
 import { ConversationSidebar } from "./features/chat/conversation-sidebar";
 import { createConversationStore } from "./features/chat/conversation-store";
+import { DeviceDialog } from "./features/devices/device-dialog";
+import { createDeviceStore } from "./features/devices/device-store";
 import { ProviderDialog } from "./features/models/provider-dialog";
 import { createModelStore } from "./features/models/model-store";
+import { StorageDialog } from "./features/storage/storage-dialog";
 import { modelKey } from "./features/models/types";
 import "./app.css";
 
@@ -26,12 +29,15 @@ export function App() {
   const [dragging, setDragging] = createSignal(false);
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
   const [providerDialogOpen, setProviderDialogOpen] = createSignal(false);
+  const [deviceDialogOpen, setDeviceDialogOpen] = createSignal(false);
+  const [storageDialogOpen, setStorageDialogOpen] = createSignal(false);
   const [agentWorking, setAgentWorking] = createSignal(false);
   const [fileWrite, setFileWrite] = createSignal<{ readonly name: string; readonly progress: number } | null>(
     null,
   );
   const conversations = createConversationStore();
   const models = createModelStore();
+  const devices = createDeviceStore();
   const agentRuntime = createRepiAgentRuntime({ openFile: conversations.openFile });
   const finePointer = createFinePointer();
 
@@ -223,6 +229,7 @@ export function App() {
           ready={conversations.ready()}
           storageError={conversations.storageError()}
           usage={conversations.usage()}
+          device={devices.sidebar()}
           onNew={() => {
             conversations.start();
             setSidebarOpen(false);
@@ -239,6 +246,15 @@ export function App() {
           onAddProvider={() => {
             setSidebarOpen(false);
             setProviderDialogOpen(true);
+          }}
+          onOpenDevice={() => {
+            setSidebarOpen(false);
+            setDeviceDialogOpen(true);
+          }}
+          onOpenStorage={() => {
+            setSidebarOpen(false);
+            setStorageDialogOpen(true);
+            void conversations.refreshStorage();
           }}
           onClose={() => setSidebarOpen(false)}
         />
@@ -267,6 +283,31 @@ export function App() {
           </Match>
         </Switch>
       </div>
+
+      <DeviceDialog
+        open={deviceDialogOpen()}
+        status={devices.status()}
+        available={devices.available()}
+        device={devices.device()}
+        error={devices.error()}
+        onClose={() => setDeviceDialogOpen(false)}
+        onRefresh={() => devices.refresh()}
+        onConnect={(id) => devices.connect(id)}
+        onRequestDevice={() => devices.requestAndConnect()}
+        onDisconnect={() => devices.disconnect()}
+      />
+
+      <StorageDialog
+        open={storageDialogOpen()}
+        usage={conversations.usage()}
+        files={conversations.files()}
+        conversations={conversations.conversations()}
+        error={conversations.storageError()}
+        onClose={() => setStorageDialogOpen(false)}
+        onDeleteFile={(id) => conversations.removeFile(id)}
+        onDeleteAll={() => conversations.removeAllFiles()}
+        onKeep={() => conversations.keepStorage()}
+      />
 
       <ProviderDialog
         open={providerDialogOpen()}

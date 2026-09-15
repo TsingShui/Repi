@@ -2,9 +2,10 @@ import type { Conversation } from "../../features/chat/types";
 import type { ModelProvider } from "../../features/models/types";
 
 const DATABASE_NAME = "repi-workspace";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const CONVERSATIONS = "conversations";
 const FILES = "files";
+const FILE_BLOBS = "file-blobs";
 const PROVIDERS = "providers";
 const OPFS_FILES = "binaries";
 
@@ -28,8 +29,17 @@ export interface StorageUsage {
   readonly backend: "opfs" | "indexeddb";
 }
 
+/**
+ * File metadata as it is stored.
+ *
+ * Bytes are never part of this record. OPFS holds them when it is available and the
+ * `FILE_BLOBS` store holds them when it is not, which is what keeps listing what is
+ * cached cheap: a listing would otherwise pull every stored binary through memory.
+ *
+ * `blob` is only ever read. It is the shape version 2 wrote, and `migrateInlineBlobs`
+ * moves those values into `FILE_BLOBS` on the next open.
+ */
 interface FileRecord extends StoredFile {
-  /** Present only when OPFS is unavailable and IndexedDB is the fallback. */
   readonly blob?: Blob;
 }
 
@@ -72,8 +82,41 @@ async function openDatabase(): Promise<IDBDatabase> {
     if (!database.objectStoreNames.contains(PROVIDERS)) {
       database.createObjectStore(PROVIDERS, { keyPath: "id" });
     }
+    if (!database.objectStoreNames.contains(FILE_BLOBS)) {
+      database.createObjectStore(FILE_BLOBS, { keyPath: "id" });
+    }
   });
   return requestResult(request);
+}
+
+/**
+ * Moves pre-version-3 inline blobs into their own store.
+ *
+ * Version 2 kept a browser without OPFS honest by putting the bytes inside the
+ * metadata record, which made a plain listing of the cache read every binary. This
+ * runs once, touches only records that still carry the old field, and leaves the old
+ * shape readable if it fails.
+ */
+async function migrateInlineBlobs(db: IDBDatabase): Promise<void> {
+  const read = db.transaction(FILES, "readonly");
+  const records = await requestResult(
+    read.objectStore(FILES).getAll() as IDBRequest<FileRecord[]>,
+  );
+  await transactionDone(read);
+
+  const legacy = records.filter((record) => record.blob instanceof Blob);
+  if (legacy.length === 0) return;
+
+  const write = db.transaction([FILES, FILE_BLOBS], "readwrite");
+  const completed = transactionDone(write);
+  const files = write.objectStore(FILES);
+  const blobs = write.objectStore(FILE_BLOBS);
+  for (const record of legacy) {
+    const { blob, ...metadata } = record;
+    blobs.put({ id: record.id, blob });
+    files.put(metadata);
+  }
+  await completed;
 }
 
 function makeId(): string {
@@ -153,7 +196,11 @@ function legacyConversations(): readonly Conversation[] {
  * back to a Blob record, preserving functionality with a weaker large-file path.
  */
 export function createWorkspaceStorage() {
-  const database = openDatabase();
+  const database = openDatabase().then(async (db) => {
+    // Best effort: if the move fails, the records still read through their old field.
+    await migrateInlineBlobs(db).catch(() => undefined);
+    return db;
+  });
 
   const listConversations = async (): Promise<readonly Conversation[]> => {
     const db = await database;
@@ -226,6 +273,7 @@ export function createWorkspaceStorage() {
     } as const;
 
     let record: FileRecord;
+    let bytes: Blob | undefined;
     if (opfsAvailable()) {
       const directory = await binaryDirectory();
       const handle = await directory.getFileHandle(id, { create: true });
@@ -247,21 +295,51 @@ export function createWorkspaceStorage() {
       }
       record = { ...common, backend: "opfs" };
     } else {
-      record = { ...common, backend: "indexeddb", blob: file };
+      record = { ...common, backend: "indexeddb" };
+      bytes = file;
       onProgress?.(file.size);
     }
 
     try {
       const db = await database;
-      const transaction = db.transaction(FILES, "readwrite");
+      const transaction = db.transaction(bytes ? [FILES, FILE_BLOBS] : FILES, "readwrite");
       const completed = transactionDone(transaction);
       transaction.objectStore(FILES).put(record);
+      if (bytes) transaction.objectStore(FILE_BLOBS).put({ id, blob: bytes });
       await completed;
       return record;
     } catch (error) {
       if (record.backend === "opfs") await removeOpfsFile(id).catch(() => undefined);
       throw error;
     }
+  };
+
+  const listFiles = async (): Promise<readonly StoredFile[]> => {
+    const db = await database;
+    const transaction = db.transaction(FILES, "readonly");
+    const completed = transactionDone(transaction);
+    const records = await requestResult(
+      transaction.objectStore(FILES).getAll() as IDBRequest<FileRecord[]>,
+    );
+    await completed;
+    return records
+      .map((record) => {
+        const { blob: _blob, ...metadata } = record;
+        void _blob;
+        return metadata;
+      })
+      .sort((left, right) => right.createdAt - left.createdAt);
+  };
+
+  const readStoredBlob = async (id: string): Promise<Blob | undefined> => {
+    const db = await database;
+    const transaction = db.transaction(FILE_BLOBS, "readonly");
+    const completed = transactionDone(transaction);
+    const record = await requestResult(
+      transaction.objectStore(FILE_BLOBS).get(id) as IDBRequest<{ blob: Blob } | undefined>,
+    );
+    await completed;
+    return record?.blob;
   };
 
   const openFile = async (id: string): Promise<File> => {
@@ -280,8 +358,8 @@ export function createWorkspaceStorage() {
       const handle = await directory.getFileHandle(id);
       blob = await handle.getFile();
     } else {
-      if (!record.blob) throw new Error("The stored file contents are missing.");
-      blob = record.blob;
+      blob = record.blob ?? (await readStoredBlob(id))!;
+      if (!blob) throw new Error("The stored file contents are missing.");
     }
 
     return new File([blob], record.name, {
@@ -300,9 +378,10 @@ export function createWorkspaceStorage() {
     await readCompleted;
     if (record?.backend === "opfs") await removeOpfsFile(id);
 
-    const write = db.transaction(FILES, "readwrite");
+    const write = db.transaction([FILES, FILE_BLOBS], "readwrite");
     const writeCompleted = transactionDone(write);
     write.objectStore(FILES).delete(id);
+    write.objectStore(FILE_BLOBS).delete(id);
     await writeCompleted;
   };
 
@@ -321,11 +400,15 @@ export function createWorkspaceStorage() {
         .map((record) => removeOpfsFile(record.id)),
     );
 
-    const write = db.transaction([CONVERSATIONS, FILES], "readwrite");
+    const write = db.transaction([CONVERSATIONS, FILES, FILE_BLOBS], "readwrite");
     const writeCompleted = transactionDone(write);
     write.objectStore(CONVERSATIONS).delete(id);
     const files = write.objectStore(FILES);
-    for (const record of records) files.delete(record.id);
+    const blobs = write.objectStore(FILE_BLOBS);
+    for (const record of records) {
+      files.delete(record.id);
+      blobs.delete(record.id);
+    }
     await writeCompleted;
   };
 
@@ -404,6 +487,7 @@ export function createWorkspaceStorage() {
     listConversations,
     putConversation,
     saveFile,
+    listFiles,
     openFile,
     deleteFile,
     deleteConversation,

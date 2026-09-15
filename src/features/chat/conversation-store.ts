@@ -1,6 +1,6 @@
 import { createSignal, onCleanup } from "solid-js";
 import type { Message } from "@earendil-works/pi-ai";
-import { createWorkspaceStorage, type StorageUsage } from "../../lib/storage/workspace-storage";
+import { createWorkspaceStorage, type StorageUsage, type StoredFile } from "../../lib/storage/workspace-storage";
 import type { ChatLine, Conversation } from "./types";
 
 const ACTIVE_KEY = "repi.active-conversation.v1";
@@ -62,6 +62,7 @@ export function createConversationStore() {
   const [ready, setReady] = createSignal(false);
   const [storageError, setStorageError] = createSignal<string | null>(null);
   const [usage, setUsage] = createSignal<StorageUsage | null>(null);
+  const [files, setFiles] = createSignal<readonly StoredFile[]>([]);
   let disposed = false;
   let writeQueue = Promise.resolve();
 
@@ -83,6 +84,24 @@ export function createConversationStore() {
     }
   };
 
+  /*
+   * What is cached belongs here rather than in its own store: a file is owned by the
+   * conversation that accepted it, deleting one deletes the other, and two modules
+   * keeping the same bookkeeping is how they drift.
+   */
+  const refreshFiles = async () => {
+    try {
+      const stored = await storage.listFiles();
+      if (!disposed) setFiles(stored);
+    } catch (error) {
+      reportError(error);
+    }
+  };
+
+  const refreshStorage = async () => {
+    await Promise.all([refreshUsage(), refreshFiles()]);
+  };
+
   const initialization = (async () => {
     try {
       const restored = await storage.listConversations();
@@ -97,7 +116,7 @@ export function createConversationStore() {
     } finally {
       if (!disposed) setReady(true);
     }
-    await refreshUsage();
+    await refreshStorage();
   })();
 
   onCleanup(() => {
@@ -244,7 +263,7 @@ export function createConversationStore() {
     enqueue(async () => {
       await storage.deleteConversation(id);
       if (replacement) await storage.putConversation(replacement);
-      await refreshUsage();
+      await refreshStorage();
     });
   };
 
@@ -265,7 +284,7 @@ export function createConversationStore() {
         throw new Error("The conversation was deleted before the file finished saving.");
       }
 
-      await refreshUsage();
+      await refreshStorage();
       return stored.id;
     } catch (error) {
       reportError(error);
@@ -273,8 +292,54 @@ export function createConversationStore() {
     }
   };
 
-  const deleteFile = async (id: string) => {
+  /*
+   * A card that said "Saved locally" must stop saying it once the bytes are gone, so
+   * the id is cleared from any file line that carries it. The line itself stays: what
+   * was opened is part of what happened in the conversation.
+   */
+  const forgetStoredFile = (storedFileId: string) => {
+    const changed: Conversation[] = [];
+    setConversations((current) =>
+      current.map((conversation) => {
+        const owns = conversation.lines.some(
+          (line) => line.kind === "file" && line.storedFileId === storedFileId,
+        );
+        if (!owns) return conversation;
+
+        const updated: Conversation = {
+          ...conversation,
+          updatedAt: Date.now(),
+          lines: conversation.lines.map((line) => {
+            if (line.kind !== "file" || line.storedFileId !== storedFileId) return line;
+            const { storedFileId: _removed, ...withoutFile } = line;
+            void _removed;
+            return withoutFile;
+          }),
+        };
+        changed.push(updated);
+        return updated;
+      }),
+    );
+    for (const conversation of changed) enqueue(() => storage.putConversation(conversation));
+  };
+
+  const removeFile = async (id: string) => {
+    setStorageError(null);
     await storage.deleteFile(id);
+    forgetStoredFile(id);
+    await refreshStorage();
+  };
+
+  const removeAllFiles = async () => {
+    setStorageError(null);
+    const ids = files().map((file) => file.id);
+    await Promise.all(ids.map((id) => storage.deleteFile(id)));
+    for (const id of ids) forgetStoredFile(id);
+    await refreshStorage();
+  };
+
+  const keepStorage = async () => {
+    await storage.requestPersistence().catch(() => false);
     await refreshUsage();
   };
 
@@ -285,6 +350,7 @@ export function createConversationStore() {
     ready,
     storageError,
     usage,
+    files,
     appendTo,
     updateAssistant,
     persistConversation,
@@ -295,9 +361,11 @@ export function createConversationStore() {
     clearProviderSelection,
     remove,
     saveFile,
-    deleteFile,
+    removeFile,
+    removeAllFiles,
+    keepStorage,
     openFile: storage.openFile,
-    refreshUsage,
+    refreshStorage,
     whenReady: () => initialization,
   };
 }

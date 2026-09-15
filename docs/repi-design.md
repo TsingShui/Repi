@@ -54,9 +54,31 @@ merged:
   badge saying whether anything in this build can read it. That badge is the point
   of the card: "nothing here reads this" is an answer, and silence is not.
 
-The rail carries the product identity and the About link. The conversation has no
-header: the disconnected model state is not useful enough to reserve a row for it.
-On narrow screens, a single floating button opens the conversation-history drawer.
+The rail carries the product identity and the About link. Its lower-left stack also
+holds **Storage** and **Device**.
+
+**Storage** is the one row there that shows a quantity rather than a state: the amount
+the browser is holding, a bar for how much of the quota that is, and the backend and
+retention policy underneath. The bar is green while there is room, amber past three
+quarters, red past nine tenths, because the only thing a capacity bar has to say is
+when to stop. A store that holds something is never drawn empty: a few hundred
+kilobytes against a ten-gigabyte quota rounds to nothing, and zero would be a lie about
+a cache that is not empty. The whole row is the control that opens the panel, which
+lists the cached binaries — name, format and architecture read back from the
+transcript card, size, date, owning conversation — and deletes them one at a time or
+all at once behind a second tap. That footer control is always present and disabled
+when the cache is empty: the first version only appeared once there was more than one
+file, which read as a panel with no way to empty it. Deleting clears the
+`Saved locally` badge on the card that pointed at it, because a card may not claim
+bytes that are gone.
+
+**Device** is a direct WebUSB ADB manager rather than a server-side device list.
+The user explicitly opens Chromium's USB picker and Android's ADB authorization prompt;
+the manager stores the browser ADB key locally, reports Android/ABI/SELinux facts, and
+runs only `su -c id` to state whether the connected phone grants root. It does not yet
+expose a general shell or Frida session to the Agent. The conversation has no header:
+the disconnected model state is not useful enough to reserve a row for it. On narrow
+screens, a single floating button opens the conversation-history drawer.
 
 The composer is one capsule: attach, the input, send, with the active model in a
 small selector above it. Models are grouped by provider; when none exists, the
@@ -85,7 +107,7 @@ process and terminal runtime is Node-specific and would break the browser-only t
 boundary.
 
 The empty state has a restrained hierarchy rather than one fixed sentence: one of
-four slowly rotating investigation questions, one sentence about the device boundary,
+five slowly rotating investigation questions, one sentence about the device boundary,
 the composer, and three prompts that fill — but do not submit — the composer. Rotation
 stops under `prefers-reduced-motion`; the stable screen-reader heading names the surface
 without announcing every decorative change.
