@@ -19,7 +19,7 @@
  * file here is often a whole APK that only holds one `.so` of interest.
  */
 import type { EngineOutcome } from "../../agent/quickjs-sandbox";
-import { ARCHIVE_PATH, MOUNT, runProgramSync, treeFromPaths } from "../rasc/wasi";
+import { MOUNT, mountName, runProgramSync, treeFromPaths } from "../rasc/wasi";
 import type {
   File as ShimFile,
   Inode,
@@ -142,8 +142,10 @@ export async function createKunaHost(options: KunaHostOptions): Promise<KunaHost
       // The binary the guest opens: the attached file, or something extract() mounted.
       const name = binary.startsWith("/") ? binary.replace(`${MOUNT}/`, "") : binary;
       const mounted = new Map<string, Uint8Array | Blob>(mounts);
-      if (!mounted.has(name) && name === ARCHIVE_PATH.replace(`${MOUNT}/`, "")) {
-        throw new Error("the attached binary is not mounted for kuna");
+      if (!mounted.has(name)) {
+        // The host mounts what it has; a path that is not there is a program asking for a file
+        // nobody put in the sandbox.
+        throw new Error(`${name} is not mounted for kuna. ls() lists what is.`);
       }
 
       // Two mounts, because the guest is told about two paths: the binary it opens, and the
@@ -224,10 +226,12 @@ function collectLeaves(
 
 /** The mount map a host hands to Kuna: the attached file plus anything `extract()` produced. */
 export function kunaMounts(
-  archive: Blob,
+  archive: File,
   extracted: ReadonlyMap<string, Uint8Array>,
 ): Map<string, Uint8Array | Blob> {
-  const mounts = new Map<string, Uint8Array | Blob>([["archive.apk", archive]]);
+  // Under the file's own name, so the path in a command line is the path the user recognises and
+  // the one `ls()` reports: an ELF is not an `archive.apk` and should not be told it is.
+  const mounts = new Map<string, Uint8Array | Blob>([[mountName(archive.name), archive]]);
   for (const [name, bytes] of extracted) mounts.set(name, bytes);
   return mounts;
 }

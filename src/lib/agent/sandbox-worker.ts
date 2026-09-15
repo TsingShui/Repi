@@ -30,7 +30,7 @@ import { normalizeVfsPath } from "./text-files";
 import { createVfsFunctions } from "./vfs-functions";
 import { createKunaHost, kunaMounts, type KunaHost } from "../analysis/kuna/kuna-host";
 import { DEFAULT_MAX_INFLATED_ENTRY } from "../analysis/rasc/limits";
-import { ARCHIVE_PATH, MOUNT, runCommandSync } from "../analysis/rasc/wasi";
+import { MOUNT, mountedPath, mountName, runCommandSync } from "../analysis/rasc/wasi";
 import { Sandbox, type EngineOutcome, type SandboxLimits, type SandboxOutcome } from "./quickjs-sandbox";
 
 export type SandboxEngine = "rasc" | "kuna";
@@ -43,7 +43,7 @@ export interface EngineSource {
 
 export interface SandboxLoadRequest {
   readonly type: "load";
-  /** The binary under analysis, mounted read-only at `ARCHIVE_PATH`. */
+  /** The binary under analysis, mounted read-only under its own name. */
   readonly file: File;
   /**
    * The shared virtual filesystem: what earlier sessions produced, by path.
@@ -157,6 +157,7 @@ function runEngine(
   const result = runCommandSync({
     wasm: engine.module,
     file: state.file,
+    name: state.file.name,
     args: argv,
     env: { RASC_MAX_INFLATED_ENTRY: String(state.maxInflatedEntry) },
     mounts: state.written,
@@ -207,8 +208,9 @@ function hostFor(state: Loaded) {
       ls(): { path: string; bytes: number; readOnly: boolean }[] {
         // One entry per path: a file that exists both shared and rewritten in this session is
         // one file, and the writable copy is the one a program would open.
+        const mounted = mountedPath(state.file.name);
         const byPath = new Map<string, { path: string; bytes: number; readOnly: boolean }>([
-          [ARCHIVE_PATH, { path: ARCHIVE_PATH, bytes: state.file.size, readOnly: true }],
+          [mounted, { path: mounted, bytes: state.file.size, readOnly: true }],
         ]);
         for (const [name, bytes] of state.shared) {
           byPath.set(`${MOUNT}/${name}`, { path: `${MOUNT}/${name}`, bytes: bytes.byteLength, readOnly: true });
@@ -356,4 +358,4 @@ self.onmessage = async (event: MessageEvent<SandboxRequest>) => {
 };
 
 /** Kept so the mount path is visible from both sides without importing the engine module. */
-export { ARCHIVE_PATH };
+export { mountName };

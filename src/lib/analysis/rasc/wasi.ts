@@ -33,7 +33,25 @@ import type { FilestatShape } from "../../../vendor/kuna/vendor/browser_wasi_shi
 
 /** Where the user's file is mounted, and the only path a command line should name. */
 export const MOUNT = "/work";
-export const ARCHIVE_PATH = `${MOUNT}/archive.apk`;
+
+/**
+ * A name that can be mounted: the file's own, with nothing in it that names a directory.
+ *
+ * The mount used to be called `archive.apk` for everything, which was a lie the moment the app
+ * could take a native library or an ELF: the engines pick their parser from the bytes, so a wrong
+ * name changed no result — but it changed what the user read, and a path claiming `.apk` under an
+ * analysis of `libfoo.so` is the app telling them something untrue about their own file.
+ */
+export function mountName(fileName: string): string {
+  const base = fileName.split(/[/\\]/).pop() ?? "";
+  const cleaned = base.replace(/[\u0000-\u001f]/g, "").trim();
+  return cleaned === "" || cleaned === "." || cleaned === ".." ? "binary" : cleaned;
+}
+
+/** Where that file is mounted, for the command lines and the user's benefit. */
+export function mountedPath(fileName: string): string {
+  return `${MOUNT}/${mountName(fileName)}`;
+}
 
 /**
  * Builds a directory tree from slash-separated paths.
@@ -304,6 +322,8 @@ export interface WasiRunRequest {
   readonly wasm: WebAssembly.Module | ArrayBuffer;
   /** The archive to mount. Only the mount path in `argv` will resolve. */
   readonly file: Blob;
+  /** What to call it in the mount. A `Blob` has no name, and the caller does. */
+  readonly name?: string;
   /** The command line after the program name. */
   readonly args: readonly string[];
   /** Host policy, in the environment rather than in the command line. */
@@ -370,7 +390,9 @@ export async function runCommand(request: WasiRunRequest): Promise<WasiRunResult
  * reads comes from a `Blob` read through `FileReaderSync`.
  */
 export function runCommandSync(request: WasiRunRequest): WasiRunResult {
-  const entries = new Map<string, Uint8Array | Blob>([["archive.apk", request.file]]);
+  const entries = new Map<string, Uint8Array | Blob>([
+    [mountName(request.name ?? "binary"), request.file],
+  ]);
   for (const [name, bytes] of request.mounts ?? []) entries.set(name, bytes);
   const writable = treeFromPaths(entries);
   const shared = treeFromPaths(request.readOnly ?? [], { readOnly: true });

@@ -17,7 +17,7 @@
  */
 import { createEffect, createSignal, Show } from "solid-js";
 import { detectFormat } from "../../lib/detect-format";
-import { ARCHIVE_PATH } from "../../lib/analysis/rasc/wasi";
+import { mountedPath } from "../../lib/analysis/rasc/wasi";
 import { openSandbox } from "../../lib/agent/sandbox";
 import { createWorkspaceStorage } from "../../lib/storage/workspace-storage";
 import type { SandboxOutcome } from "../../lib/agent/quickjs-sandbox";
@@ -32,8 +32,8 @@ const storage = createWorkspaceStorage();
  * the host fetch and compile Kuna, and the program is then run again. This program is written
  * as if that never happened, which is the point.
  */
-const APK_PROGRAM = `
-  const entries = rasc(['entries', '${ARCHIVE_PATH}']).stdout.split('\\n');
+const apkProgram = (binary: string) => `
+  const entries = rasc(['entries', '${binary}']).stdout.split('\\n');
   const libraries = entries
     .map((line) => line.split(' | ')[0].trim())
     .filter((name) => name.startsWith('lib/') && name.endsWith('.so'));
@@ -57,10 +57,10 @@ const APK_PROGRAM = `
 `;
 
 /** Lists and decompiles: this is the path that needs a SLEIGH spec fetched on demand. */
-const KUNA_PROGRAM = `
-  const listed = JSON.parse(kuna(['${ARCHIVE_PATH}', 'list']).stdout);   // the host re-runs this once if a spec has to be fetched
+const kunaProgram = (binary: string) => `
+  const listed = JSON.parse(kuna(['${binary}', 'list']).stdout);   // the host re-runs this once if a spec has to be fetched
   const target = listed.functions[0].name;
-  const decompiled = JSON.parse(kuna(['${ARCHIVE_PATH}', 'decompile', target]).stdout);
+  const decompiled = JSON.parse(kuna(['${binary}', 'decompile', target]).stdout);
   return JSON.stringify({ functions: listed.count, target, c: decompiled.functions[0].code.split('\\n')[0] });
 `;
 
@@ -90,7 +90,11 @@ export function ProbeScreen() {
 
       const params = new URLSearchParams(window.location.search);
       const encoded = params.get("code");
-      const code = encoded ? atob(encoded) : format.engine === "kuna" ? KUNA_PROGRAM : APK_PROGRAM;
+          const code = encoded
+        ? atob(encoded)
+        : format.engine === "kuna"
+          ? kunaProgram(mountedPath(file.name))
+          : apkProgram(mountedPath(file.name));
 
       // What earlier sessions produced, mounted read-only: the shared virtual filesystem.
       const derived = await storage.listDerived();

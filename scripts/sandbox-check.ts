@@ -17,7 +17,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { openSync, readSync, statSync, closeSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractEntry } from "../src/lib/analysis/archive/zip-extract";
 import { createVfsFunctions } from "../src/lib/agent/vfs-functions";
@@ -71,7 +71,8 @@ function rasc(untyped: readonly unknown[]): EngineOutcome {
   return { stdout: parsed.text, stderr: "", code: parsed.code };
 }
 
-const ARCHIVE_PATH = "/work/archive.apk";
+// The mount is named after the file, so the check's programs name it too.
+const ARCHIVE_PATH = `/work/${basename(apk)}`;
 const LIMITS = { memoryBytes: 256 << 20, deadlineMs: 15_000 };
 let sandbox = new Sandbox({ functions: { rasc } }, LIMITS);
 /** What the page does when a run poisons the interpreter: a new Worker, not a reused one. */

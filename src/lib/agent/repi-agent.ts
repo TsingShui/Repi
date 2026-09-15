@@ -15,7 +15,7 @@ import type { Conversation } from "../../features/chat/types";
 import { loadPiProvider } from "../../features/models/pi-providers";
 import { modelKey, type ModelProvider } from "../../features/models/types";
 import { artifactAvailable, artifactUrl } from "../analysis/engine-artifacts";
-import { ARCHIVE_PATH } from "../analysis/rasc/wasi";
+import { mountedPath } from "../analysis/rasc/wasi";
 import { ENGINE_WASM } from "./sandbox";
 import { detectFormat, type FormatMatch } from "../detect-format";
 import { openSandbox, type SandboxSession } from "./sandbox";
@@ -227,12 +227,13 @@ have to be fetched before it can run; when that happens the host loads it and ru
 program again, so read the answer, not a first failure. In scope:
 
   rasc(args)     runs the engine and returns { stdout, stderr, code }. args is its command
-                 line — the attached archive is mounted at "${ARCHIVE_PATH}". Kuna takes its
-                 commands as a function that reads files already mounted. Examples:
-                   rasc(['manifest', "${ARCHIVE_PATH}"])
-                   rasc(['classes', '--filter', 'Activity', "${ARCHIVE_PATH}"])
-                   rasc(['strings', '--limit', '50', '--filter', 'http', "${ARCHIVE_PATH}"])
-                   rasc(['getclass', "${ARCHIVE_PATH}", 'com.example.MainActivity'])
+                 line — the binary this program runs against is mounted under /work, under its
+                 own name (an .apk stays an .apk, a .so stays a .so), and list_binaries says
+                 which path that is for each file. Examples:
+                   rasc(['manifest', '/work/<the attached file>'])
+                   rasc(['classes', '--filter', 'Activity', '/work/<the attached file>'])
+                   rasc(['strings', '--limit', '50', '--filter', 'http', '/work/<the attached file>'])
+                   rasc(['getclass', '/work/<the attached file>', 'com.example.MainActivity'])
                    extract('/lib/arm64-v8a/libfoo.so')      // { path, bytes }
                    kuna([binaryPath, 'list'])               // every function as a JSON record
                    kuna([binaryPath, 'decompile', 'JNI_OnLoad'])
@@ -275,8 +276,9 @@ ${outcome.error.stack.split("\n").slice(0, 3).join("\n")}` : "";
     parts.push(`error: ${outcome.error.name}: ${outcome.error.message}${where}`);
   }
   parts.push(
-    `[${entry.format.label}: ${outcome.calls} engine call(s), ${outcome.ms} ms` +
-      `${outcome.truncated ? ", output truncated" : ""}]`,
+    // The mounted path, so the summary says what was looked at rather than only what it was.
+    `[${mountedPath(entry.file.name)}: ${entry.format.label}, ${outcome.calls} engine call(s), ` +
+      `${outcome.ms} ms${outcome.truncated ? ", output truncated" : ""}]`,
   );
   if (outcome.truncated) {
     // Cut is not the same as small: say what to do instead of leaving a document that stops
@@ -436,6 +438,8 @@ that comes after. What is not shared is attention — a program runs against one
                   fileId: file.id,
                   name: file.name,
                   bytes: file.bytes,
+                  /** The path a program sees it at, which is the path rasc and kuna take. */
+                  mountsAt: mountedPath(file.name),
                   // Which conversation it arrived in is not part of the answer: it is the same
                   // file either way, and saying so invites the idea that it might not be.
                 })),
