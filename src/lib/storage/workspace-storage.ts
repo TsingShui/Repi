@@ -535,8 +535,22 @@ export function createWorkspaceStorage() {
     };
   };
 
-  const requestPersistence = async (): Promise<boolean> =>
-    navigator.storage?.persist?.() ?? Promise.resolve(false);
+  /**
+   * Asks the browser to keep this origin's storage.
+   *
+   * The answer is reported rather than swallowed, because it is not something a page can
+   * influence: Chromium resolves this immediately from its own heuristics (an installed app,
+   * and how much the site is used) and never shows a prompt, while Firefox does ask. A button
+   * that looks like a prompt and silently does nothing is worse than no button.
+   */
+  const requestPersistence = async (): Promise<"granted" | "denied" | "unsupported"> => {
+    if (typeof navigator.storage?.persist !== "function") return "unsupported";
+    try {
+      return (await navigator.storage.persist()) ? "granted" : "denied";
+    } catch {
+      return "denied";
+    }
+  };
 
   return {
     listConversations,

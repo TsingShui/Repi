@@ -338,9 +338,10 @@ export function createConversationStore() {
     await refreshStorage();
   };
 
-  const keepStorage = async () => {
-    await storage.requestPersistence().catch(() => false);
+  const keepStorage = async (): Promise<"granted" | "denied" | "unsupported"> => {
+    const verdict = await storage.requestPersistence().catch((): "denied" => "denied");
     await refreshUsage();
+    return verdict;
   };
 
   return {

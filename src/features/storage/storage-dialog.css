@@ -17,7 +17,6 @@
 }
 
 .storage-dialog-head,
-.storage-summary-figures,
 .storage-files-head,
 .storage-dialog-foot {
   display: flex;
@@ -73,40 +72,56 @@
 
 /* ========================================================== capacity */
 
-.storage-summary {
-  margin-top: 22px;
-  padding: 16px;
+/*
+ * The status line.
+ *
+ * The tree is the content, so the capacity story is one line above it rather than a card of
+ * its own: what is stored, out of what the browser allows, which backend holds it, and whether
+ * it survives pressure. The figures are the tree's own totals, so they cannot disagree with
+ * the rows underneath.
+ */
+.storage-status {
+  margin-top: 18px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--canvas-raised);
 }
 
-.storage-summary-figures {
+.storage-status-line {
+  display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.storage-summary-figures strong {
-  font-size: 26px;
+.storage-status-line strong {
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
-.storage-summary-figures span {
+.storage-status-files,
+.storage-status-quota {
   color: var(--ink-faint);
-  font-size: 13px;
+  font-size: 12px;
 }
 
-.storage-summary-track {
+.storage-status-quota {
+  margin-left: auto;
+}
+
+.storage-status-track {
   display: block;
-  height: 8px;
-  margin-top: 12px;
+  height: 3px;
+  margin-top: 9px;
   overflow: hidden;
   border-radius: var(--r-pill);
   background: var(--canvas);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.storage-summary-fill {
+.storage-status-fill {
   display: block;
   height: 100%;
   min-width: 2px;
@@ -115,19 +130,24 @@
   transition: width 240ms ease;
 }
 
-.storage-summary[data-level="working"] .storage-summary-fill {
+.storage-status[data-level="working"] .storage-status-fill {
   background: var(--working);
 }
 
-.storage-summary[data-level="danger"] .storage-summary-fill {
+.storage-status[data-level="danger"] .storage-status-fill {
   background: var(--danger);
 }
 
-.storage-summary-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 13px;
+.storage-keep-inline {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .storage-chip {
@@ -142,38 +162,6 @@
 .storage-chip[data-retention="persistent"] {
   background: var(--local-soft);
   color: var(--local);
-}
-
-.storage-keep {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 14px;
-  padding-top: 13px;
-  border-top: 1px solid var(--line);
-}
-
-.storage-keep p {
-  color: var(--ink-faint);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.storage-keep button {
-  flex: none;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  padding: 0 13px;
-  background: var(--canvas);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.storage-keep button:hover {
-  background: var(--accent-soft);
 }
 
 /* ========================================================== cached files */
@@ -369,4 +357,118 @@
   .storage-file-facts {
     display: none;
   }
+}
+
+/*
+ * The tree.
+ *
+ * Folders are drawn from the paths themselves rather than kept as a separate structure, so
+ * what the panel shows and what a program opens are the same layout. Rows are the existing
+ * file row with a toggle in front of it, indented by depth — a tree is a list whose items
+ * carry an indent, and anything more elaborate stops being readable at four levels.
+ */
+.storage-tree {
+  display: grid;
+  gap: 9px;
+}
+
+.storage-tree-root,
+.storage-tree-children {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storage-tree-row {
+  display: grid;
+  grid-template-columns: 18px 26px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.storage-tree-row[data-kind="dir"] {
+  cursor: pointer;
+}
+
+.storage-tree-row:hover,
+.storage-tree-row:focus-visible {
+  background: var(--canvas-raised);
+}
+
+.storage-tree-toggle,
+.storage-tree-folder,
+.storage-tree-spacer {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--ink-muted);
+}
+
+.storage-tree-folder {
+  width: 26px;
+  height: 26px;
+}
+
+.storage-tree-toggle svg,
+.storage-tree-folder svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.6;
+}
+
+.storage-tree-toggle[data-open="true"] svg {
+  transform: rotate(90deg);
+}
+
+.storage-tree-row[data-kind="dir"] .storage-file-name {
+  color: var(--ink);
+}
+
+.storage-tree-row .storage-file-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.storage-tree-row .storage-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-tree-row .storage-file-facts {
+  font-size: 0.8em;
+  color: var(--ink-muted);
+}
+
+.storage-tree-children {
+  position: relative;
+}
+
+.storage-tree-children::before {
+  /* One hairline per level, so the nesting is visible without a box per folder. */
+  content: "";
+  position: absolute;
+  inset: 2px auto 2px 0;
+  left: calc(12px + (var(--tree-depth, 0) * 16px));
+  width: 1px;
+  background: var(--line);
+}
+
+.storage-status-note {
+  margin-top: 9px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
 }

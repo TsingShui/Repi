@@ -208,9 +208,11 @@ function hostFor(state: Loaded) {
         const path = String(args[0] ?? "");
         if (path === "") throw new Error("extract(path) needs the name of an archive entry");
         const entry = extractEntry(blobReader(state.file), state.file.size, path);
-        const mountName = entry.name.split("/").filter(Boolean).pop() ?? entry.name;
-        state.written.set(mountName, entry.bytes);
-        return { path: `${MOUNT}/${mountName}`, bytes: entry.bytes.length };
+        // The entry's own path, not its basename: two architectures hold the same library
+        // name, and a tree that flattens them cannot show both.
+        const mounted = entry.name.replace(/^\/+/, "");
+        state.written.set(mounted, entry.bytes);
+        return { path: `${MOUNT}/${mounted}`, bytes: entry.bytes.length };
       },
 
       /**
