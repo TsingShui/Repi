@@ -44,16 +44,12 @@ Long output is cut off and a command that runs longer than two minutes is killed
 which are reported back — a truncated answer is still an answer, so narrow the command instead
 of repeating it.
 
-\`input\` is written to the command's stdin and then closed. That is how a program that reads a
-script from stdin is driven, and it is the reason Frida works here: frida-inject runs on the
-device, takes its script as \`-s -\`, and writes the script's \`console.log\` and \`send()\` messages
-to its own stdout, so
-
-  device("su -c '/data/local/tmp/frida-inject -n com.example -s -'", scriptText)
-
-returns what the script printed, with no file written to the device and no Frida client
-anywhere. Its binary is not part of this app: it has to be brought in (attach the release
-binary for the device's ABI, then device_push it and chmod +x it) and it needs root.`;
+\`input\` is written to the command's stdin and then closed, which is how a program that reads a
+script from stdin is driven — a shell (\`sh -s\`), a REPL, a tool that takes its instructions on
+stdin. It means a script can be run without first being written to the device's disk, and it is
+the only channel here that carries something other than arguments and a file: there is no
+stdin to a command you run any other way. Whatever runs on the device is the device's business
+and yours to know — this tool only promises a shell, an exit code and a pipe.`;
 
 const PULL_DESCRIPTION = `Copy one file from the device into the shared filesystem, and say where it landed.
 
@@ -72,8 +68,8 @@ const PUSH_DESCRIPTION = `Copy a file onto the device, either from text or from 
 \`content\` writes text (a script, a config); \`source\` copies a file that is already here (an
 attached binary, an engine's output). Give one of them.
 
-  device_push('/data/local/tmp/hook.js', { content: 'Java.perform(() => { … })' })
-  device_push('/data/local/tmp/frida-inject', { source: 'frida-inject-android-arm64' })
+  device_push('/data/local/tmp/hook.js', { content: 'send("from a file");' })
+  device_push('/data/local/tmp/tool', { source: 'tool-android-arm64' })
 
 Files land as the device user can read them, not executable: run \`chmod 755\` with device() for
 anything you intend to execute.`;

@@ -62,8 +62,8 @@ export interface AndroidDeviceConnection {
    * Runs one command and waits for it.
    *
    * `input` is written to the command's stdin and then closed, which is what makes programs
-   * that read a script from stdin usable — Frida's injector is the reason this exists: it
-   * takes its script as `-s -`, so a script never has to be written to the device's disk.
+   * that read their instructions from stdin usable — a script can be run without being written
+   * to the device's disk first, and nothing else on this interface can carry it.
    * The legacy (non-shell-protocol) transport has no stdin and no exit code, and says so by
    * reporting 0 for a command whose output arrived.
    */

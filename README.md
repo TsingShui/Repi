@@ -18,7 +18,9 @@ What is in the repository today is the part of the old build that survives:
   only that text enters the model request;
 - direct WebUSB ADB connection for a locally attached Android phone: browser-stored
   ADB credentials, Android authorization, device facts and a root-capability probe all
-  stay local; Frida sessions are the next layer, not yet wired into the Agent;
+  stay local, and through it the Agent gets one shell and one file channel — a command
+  and whatever it printed, files in and out. What is built on that pipe is not this
+  app's business: it is a pipe, and the Agent already knows what runs through one;
 - the file intake (picker, drop, attach, local format detection);
 - the two engines as **programs** — Kuna for native binaries, Rasc for APK and DEX,
   both `wasm32-wasip1`, both run on the device by one WASI host over a virtual

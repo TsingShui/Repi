@@ -202,5 +202,28 @@ async function run(tool: AgentTool, input: unknown): Promise<string> {
   check("and does not describe a device that is not there", !/Android \d/.test(absent));
 }
 
+// 7. The boundary this surface is meant to hold: ADB, not the things people build on it.
+//
+// Repi owns an Android link — a shell, a pipe and a file channel. Tools that ride on ADB
+// (injectors, patchers, hooking frameworks) are the Agent's knowledge and the user's choice,
+// and a description that names one would be this app claiming a workflow it does not maintain
+// and cannot keep current. The names are listed here so the claim is checked rather than
+// remembered.
+{
+  const text = deviceTools({ device: fakeDevice({}), vfs: fakeVfs() }, "conv")
+    .map((tool) => tool.description ?? "")
+    .join("\n");
+  const named = ["frida", "magisk", "objection", "xposed"].filter((name) => text.includes(name));
+  check(
+    "the tools describe the pipe, not a program on the far end of it",
+    named.length === 0,
+    named.join(", "),
+  );
+  check(
+    "and stdin is offered as a channel rather than as a recipe",
+    /stdin/.test(text) && !/-s -/.test(text),
+  );
+}
+
 console.log(`\n${failures === 0 ? "all device tool checks passed" : `${failures} check(s) failed`}`);
 process.exitCode = failures === 0 ? 0 : 1;
