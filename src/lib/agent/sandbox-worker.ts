@@ -74,6 +74,13 @@ export interface SandboxRunRequest {
   readonly type: "run";
   readonly id: number;
   readonly code: string;
+  /**
+   * This run's budget, in milliseconds.
+   *
+   * The page decides it because the page knows what was asked for: the interpreter only knows how
+   * long the guest has been running.
+   */
+  readonly deadlineMs?: number;
 }
 
 /**
@@ -328,7 +335,9 @@ self.onmessage = async (event: MessageEvent<SandboxRequest>) => {
      * the caller should have to know about, so the loop here is bounded, and a run that needed
      * nothing new leaves after the first pass.
      */
-    let outcome = await sandbox.run(request.code);
+    let outcome = await sandbox.run(request.code, {
+      ...(request.deadlineMs === undefined ? {} : { deadlineMs: request.deadlineMs }),
+    });
     for (let round = 0; round < 3; round += 1) {
       const missingSpecs = state.ready.get("kuna")?.kuna?.missingLanguages().length ?? 0;
       if (state.wanted.size === 0 && missingSpecs === 0) break;

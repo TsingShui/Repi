@@ -191,6 +191,25 @@ const instrumented = new Sandbox({ functions: { rasc: counting } }, LIMITS);
   }
 }
 
+// -------------------------------------------------------------- a budget the caller sets
+//
+// The interpreter's deadline has to be per run, not per sandbox: the page hands one in for every
+// program, because a program that decompiles a function and one that walks a binary are the same
+// code shape with wildly different amounts of work behind them.
+{
+  const short = recycle();
+  const started = performance.now();
+  const outcome = await short.run("while (true) {}", { deadlineMs: 400 });
+  const took = performance.now() - started;
+  check(
+    "a run's own deadline is the one that stops it",
+    outcome.error?.message.includes("interrupted") === true && took < 3_000,
+    `${Math.round(took)} ms`,
+  );
+  const after = await recycle().run("return 2 + 2;");
+  check("and the next sandbox is unaffected", after.result === "4", after.result ?? "none");
+}
+
 // ------------------------------------------------- the filesystem, from inside a program
 //
 // The rules themselves are checked in `text-files-check`; what is checked here is the part that

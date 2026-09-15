@@ -249,7 +249,14 @@ export class Sandbox {
    * top-level `return` works too. Retrying is safe because a syntax error cannot have run
    * anything.
    */
-  async run(code: string): Promise<SandboxOutcome> {
+  /**
+   * Runs one program.
+   *
+   * `deadlineMs` overrides the interpreter's budget for this run only. A program that decompiles
+   * one function and one that walks a whole binary are the same code shape and wildly different
+   * amounts of work, so the ceiling belongs to the caller that knows which it asked for.
+   */
+  async run(code: string, options: { readonly deadlineMs?: number } = {}): Promise<SandboxOutcome> {
     const started = performance.now();
     const printed: string[] = [];
     const counts = { calls: 0 };
@@ -260,7 +267,7 @@ export class Sandbox {
 
     try {
       runtime.setInterruptHandler(
-        shouldInterruptAfterDeadline(Date.now() + this.#limits.deadlineMs),
+        shouldInterruptAfterDeadline(Date.now() + (options.deadlineMs ?? this.#limits.deadlineMs)),
       );
       this.#install(context, printed, counts);
 

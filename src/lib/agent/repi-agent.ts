@@ -131,15 +131,26 @@ export interface AgentRunResult {
 }
 
 /**
- * How long one program may run, measured by the host.
+ * How long one program may run, and how much of that the caller controls.
  *
- * The interpreter has its own deadline, and it is not enough: it is checked while JavaScript is
- * running, and a single engine call is one synchronous step inside wasm with nowhere to check —
- * `kuna` decompiling a whole library is minutes of work the interpreter cannot interrupt. So the
- * host imposes a ceiling of its own, and enforces it the only way a synchronous guest can be
- * stopped: by ending the worker it lives in.
+ * Two ceilings, one number. The interpreter's deadline is checked while JavaScript runs; a single
+ * engine call is one synchronous step inside wasm with nowhere to check it, so the host holds the
+ * second ceiling and enforces it the only way a synchronous guest can be stopped — by ending the
+ * worker it lives in. A program that decompiles one function and one that walks a whole binary are
+ * the same code shape and wildly different amounts of work, so `run_js` takes the number from the
+ * caller rather than inventing one: seconds, defaulting to two minutes, and bounded because the
+ * point of a sandbox is that it ends.
  */
-const PROGRAM_DEADLINE_MS = 120_000;
+const DEFAULT_PROGRAM_SECONDS = 120;
+const MIN_PROGRAM_SECONDS = 5;
+const MAX_PROGRAM_SECONDS = 600;
+
+/** The requested budget in milliseconds, and whether the request had to be pulled into range. */
+function programBudget(timeout: number | undefined): { ms: number; clamped: boolean } {
+  const seconds = timeout === undefined || !Number.isFinite(timeout) ? DEFAULT_PROGRAM_SECONDS : timeout;
+  const bounded = Math.min(MAX_PROGRAM_SECONDS, Math.max(MIN_PROGRAM_SECONDS, seconds));
+  return { ms: Math.round(bounded * 1000), clamped: bounded !== seconds };
+}
 
 /** How small a file cannot be a real engine wasm. */
 const MIN_ENGINE_BYTES = 500_000;
@@ -269,9 +280,10 @@ There is no network, no filesystem and no import: nothing else is reachable.
 Filter in the engine, not after it. Its output is tens of megabytes on a real APK, one call
 re-walks the archive in a few hundred milliseconds, and everything you print comes back to
 you. Prefer a few well-argued calls over many, and return counts and samples rather than
-tables. A program is stopped when it runs long — JavaScript at twenty seconds, and the whole call
-at two minutes, because a single engine call cannot be interrupted part-way — and a memory-heavy
-one fails with an error you can read and fix. Kuna fetches the SLEIGH spec for a binary's architecture on demand: a
+tables. A program is stopped when it runs long: \`timeout\` is how many seconds it may take
+(default ${DEFAULT_PROGRAM_SECONDS}, at most ${MAX_PROGRAM_SECONDS}) and it governs both the running
+program and the call itself, because a single engine call cannot be interrupted part-way. A
+memory-heavy program fails with an error you can read and fix. Kuna fetches the SLEIGH spec for a binary's architecture on demand: a
 program that needs one is run again for you, so read the engine's answer, not a first
 failure.`;
 
@@ -470,14 +482,22 @@ that comes after. What is not shared is attention — a program runs against one
       parameters: Type.Object({
         fileId: Type.String({ description: "Local file ID from list_binaries" }),
         code: Type.String({ description: "The JavaScript program to run in the sandbox" }),
+        timeout: Type.Optional(
+          Type.Number({
+            description: `Seconds this program may run, ${MIN_PROGRAM_SECONDS}-${MAX_PROGRAM_SECONDS}. Defaults to ${DEFAULT_PROGRAM_SECONDS}.`,
+          }),
+        ),
       }),
       async execute(_toolCallId, input, signal) {
-        const params = input as { fileId: string; code: string };
+        const params = input as { fileId: string; code: string; timeout?: number };
         const entry = await load(conversation, params.fileId);
         if (signal?.aborted) throw new Error("Stopped.");
+        const budget = programBudget(params.timeout);
         let timer: ReturnType<typeof setTimeout> | undefined;
         const outcome = await Promise.race([
-          entry.sandbox.run(params.code),
+          // The interpreter is told the same number, so a program that loops gets stopped by the
+          // guest's own budget rather than by the host killing the worker under it.
+          entry.sandbox.run(params.code, { deadlineMs: budget.ms }),
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => {
               // The session cannot survive this, so it is dropped now rather than left cached and
@@ -486,13 +506,15 @@ that comes after. What is not shared is attention — a program runs against one
               entry.sandbox.cancel();
               reject(
                 new Error(
-                  `The program was stopped after ${PROGRAM_DEADLINE_MS / 1000} seconds. A single ` +
-                    "engine call cannot be interrupted part-way, so nothing came back — ask for " +
-                    "less at once: one function instead of the whole binary, or a filtered " +
-                    "listing instead of a full one.",
+                  `The program was stopped after ${budget.ms / 1000} seconds${
+                    budget.clamped ? " (the timeout was pulled into the allowed range)" : ""
+                  }. A single engine call cannot be interrupted part-way, so nothing came back — ` +
+                    "ask for less at once, or raise the timeout for the call that needs it: one " +
+                    "function instead of the whole binary, a filtered listing instead of a full " +
+                    "one.",
                 ),
               );
-            }, PROGRAM_DEADLINE_MS);
+            }, budget.ms);
           }),
         ]).finally(() => clearTimeout(timer));
         // The program's output becomes files; until they are stored, nothing else can read them.

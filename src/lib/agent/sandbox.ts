@@ -41,7 +41,7 @@ export class SandboxCancelledError extends Error {
 
 export interface SandboxSession {
   /** Runs one program and resolves with what it printed, returned, or failed with. */
-  run(code: string): Promise<SandboxOutcome>;
+  run(code: string, options?: { readonly deadlineMs?: number }): Promise<SandboxOutcome>;
   /**
    * Adds or replaces files in the shared filesystem this session has mounted.
    *
@@ -182,14 +182,20 @@ export function openSandbox(file: File, options: SandboxSessionOptions): Sandbox
   }
 
   return {
-    async run(code) {
+    async run(code, perRun) {
       if (closed) throw new SandboxUnavailableError("The sandbox is closed.");
       await load();
       const id = (nextId += 1);
       const outcome = new Promise<SandboxOutcome>((resolve, reject) => {
+        // `onProduced` is the session's, from construction; the deadline is this run's.
         pending.set(id, { resolve, reject, onProduced: options.onProduced });
       });
-      post({ type: "run", id, code });
+      post({
+        type: "run",
+        id,
+        code,
+        ...(perRun?.deadlineMs === undefined ? {} : { deadlineMs: perRun.deadlineMs }),
+      });
       return outcome;
     },
     async refreshVfs(files) {

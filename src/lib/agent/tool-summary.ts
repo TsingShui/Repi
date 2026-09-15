@@ -60,7 +60,9 @@ export function toolSummary(name: string, args: unknown): string {
       );
     case "run_js": {
       const code = field(record, "code") ?? "";
-      return clip(`${code.split("\n").length} lines of JavaScript`);
+      const timeout = record.timeout;
+      const budget = typeof timeout === "number" ? `, ≤ ${timeout}s` : "";
+      return clip(`${code.split("\n").length} lines of JavaScript${budget}`);
     }
     case "list_binaries":
       return "";
