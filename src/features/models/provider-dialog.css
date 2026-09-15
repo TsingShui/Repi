@@ -1,0 +1,353 @@
+.provider-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+  margin: auto;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: var(--panel-lift);
+}
+
+.provider-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(3px);
+}
+
+.provider-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.provider-dialog-head h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.provider-dialog-head p {
+  margin-top: 4px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.provider-dialog-close {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-xs);
+  padding: 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.provider-dialog-close:hover {
+  background: var(--canvas-raised);
+  color: var(--ink);
+}
+
+.provider-dialog-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.provider-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 22px;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  background: var(--canvas-raised);
+}
+
+.provider-mode-tabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: calc(var(--r-sm) - 4px);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.provider-mode-tabs-two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.provider-mode-tabs button[aria-selected="true"] {
+  background: var(--canvas);
+  color: var(--ink);
+  box-shadow: var(--shadow-raised);
+}
+
+.provider-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.provider-mode-note {
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.provider-mode-error {
+  margin-top: 14px;
+}
+
+.provider-field {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.provider-field input,
+.provider-field textarea,
+.provider-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  background: var(--canvas-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+}
+
+.provider-field input:focus,
+.provider-field textarea:focus,
+.provider-field select:focus {
+  border-color: var(--accent);
+}
+
+.provider-field textarea {
+  resize: vertical;
+}
+
+.provider-field small {
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.provider-model-discovery {
+  display: grid;
+  gap: 10px;
+}
+
+.provider-model-head {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.provider-discover {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 0 13px;
+  background: var(--canvas);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.provider-discover:hover {
+  background: var(--accent-soft);
+}
+
+.provider-discover:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.discovered-models {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--canvas-raised);
+}
+
+.discovered-models p {
+  margin-bottom: 8px;
+  color: var(--local);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.discovered-models div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.discovered-models span {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  padding: 3px 8px;
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-manual-models {
+  margin-top: 2px;
+}
+
+.provider-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.provider-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.provider-actions button {
+  min-height: 40px;
+  border-radius: var(--r-pill);
+  padding: 0 17px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.provider-cancel {
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.provider-save {
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.provider-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.provider-existing {
+  display: grid;
+  gap: 6px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.provider-existing-label {
+  margin-bottom: 3px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.provider-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 9px;
+  border-radius: var(--r-sm);
+  background: var(--canvas-raised);
+}
+
+.provider-row div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.provider-row strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-row span {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.provider-row-actions {
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+.provider-row button {
+  flex: none;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 0 10px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.provider-row button:last-child {
+  color: var(--danger);
+}
+
+.provider-row button:hover {
+  background: var(--canvas);
+}
+
+.provider-row button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.provider-privacy {
+  margin-top: 18px;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 540px) {
+  .provider-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 20px;
+    border-radius: var(--r-md);
+  }
+
+}

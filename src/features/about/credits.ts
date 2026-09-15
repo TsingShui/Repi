@@ -59,6 +59,6 @@ export const CREDITS: readonly Credit[] = [
     name: "Pi Agent",
     license: "MIT",
     url: "https://github.com/earendil-works/pi",
-    note: "The agent layer this application is being built on: the loop that runs tool calls and keeps their state, and the client that speaks to a model provider. Nothing is wired to it yet.",
+    note: "The browser-safe agent loop: it streams model responses, runs Repi's local analysis tools and carries their results back into the conversation.",
   },
 ];

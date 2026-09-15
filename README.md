@@ -7,13 +7,17 @@ carries is text the agent chose out of local analysis — never the file itself.
 
 What is in the repository today is the part of the old build that survives:
 
-- the conversation, which is the home surface: a chat shell with no model
-  connected, so it reports and does not answer;
+- the conversation, which is the home surface: a chat shell with browser-local
+  history and configurable OpenAI-compatible providers. Conversation and provider
+  records live in IndexedDB; attached binaries live in OPFS where available, with
+  an IndexedDB `Blob` fallback;
+- the Pi Agent loop, connected to user-configured OpenAI-compatible providers. It
+  discovers their model catalogs through `/models` and can call bounded, read-only
+  tools over the locally stored binary; only textual tool results enter the model request;
 - the file intake (picker, drop, attach, local format detection);
 - the two engines as **analysers** — Kuna for native binaries, Rasc for APK and
   DEX, both compiled to WebAssembly and run on the device — with their Worker
-  transport and the contract they implement. They are not wired to anything yet:
-  the surface that will call them is the Agent surface;
+  transport and the contract the Agent tools call;
 - the About page, which carries the licence list — the engines ship with the page, so
   their terms have to be readable from it;
 - the analysis contract's checks, which run in Node with no browser.
@@ -78,12 +82,15 @@ src/
   app.css
   styles/global.css             design tokens and reset
   components/brand-mark.tsx
-  features/chat/                the conversation: transcript, composer, welcome
+  features/chat/                transcript, composer, and browser-local conversation history
+  features/models/              provider setup and per-conversation model selection
   features/about/               what Repi is, and the other half's install command
   features/about/structure-field.tsx  full-screen canvas backdrop
   features/about/               what Repi is, what it is built on, the install command
   features/about/credits.ts     the credits and the scopes they are grouped by
   lib/detect-format.ts          local format detection, header plus ZIP directory
+  lib/storage/                  IndexedDB records and OPFS-backed binary storage
+  lib/agent/                    Pi Agent runtime and local reverse-engineering tools
   lib/sha256.ts                 streaming digest, so a large file is never held
   lib/pointer.ts                fine or coarse pointer, read once
   lib/analysis/types.ts         the contract an engine implements

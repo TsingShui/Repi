@@ -16,6 +16,23 @@
   display: block;
 }
 
+/* The home surface borrows the texture without competing with the greeting.
+ * A strong centre veil leaves only a restrained trace around the composition. */
+.structure-field[data-variant="quiet"] {
+  opacity: 0.62;
+}
+
+.structure-field[data-variant="quiet"]::after {
+  background: radial-gradient(
+    62% 50% at 50% 47%,
+    rgb(var(--canvas-rgb) / 100%) 0%,
+    rgb(var(--canvas-rgb) / 98%) 48%,
+    rgb(var(--canvas-rgb) / 87%) 70%,
+    rgb(var(--canvas-rgb) / 46%) 88%,
+    rgb(var(--canvas-rgb) / 18%) 100%
+  );
+}
+
 /*
  * Readability veil.
  *

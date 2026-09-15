@@ -9,11 +9,18 @@
 
 ## The conversation
 
-The home surface is one conversation: a wide centred column, a transcript, and a
-capsule composer. The layout is the one the assistant surfaces have settled on — a
-greeting over the composer when nothing has been said, a composer that docks to the
-bottom once there is a transcript — because a conversation that looks like the ones
-people already use is one they do not have to learn.
+The home surface is a conversation beside browser-local history: a left rail on
+wide screens and an off-canvas drawer on narrow ones. The rail creates, selects and
+deletes conversations; each one stores its transcript in IndexedDB and takes its
+title from the first message or file. Attached binaries are streamed into OPFS,
+with an IndexedDB `Blob` fallback where OPFS is unavailable. The conversation itself is a wide centred
+column, a transcript, and a capsule composer. The layout is the one the assistant
+surfaces have settled on — a greeting over the composer when nothing has been said,
+a composer that docks to the bottom once there is a transcript — because a
+conversation that looks like the ones people already use is one they do not have
+to learn. The conversation borrows a quiet, persistent version of About's structure
+field: dimmer, slower, without fragments or pointer parallax, and masked beneath the
+content so it adds texture without reducing transcript legibility.
 
 The geometry and the layout are borrowed; the colour and the type are not. The
 palette is this product's own — its accent, its greys, its green for the local-safe
@@ -38,20 +45,44 @@ merged:
 
 - **what the user typed**, right-aligned in a tinted bubble;
 - **what the application says about itself** — what it recognised, what it cannot
-  read, what is not connected — left-aligned behind the mark, labelled `Repi`;
+  read, or a provider failure — left-aligned behind the mark, labelled `Repi`;
+- **an Agent answer**, streamed from the selected provider, rendered as Markdown
+  with syntax-highlighted code blocks, and able to call local, read-only analysis
+  tools. Raw HTML and remote Markdown images are disabled; links open only after
+  the reader acts on them;
 - **a file**, as a card under the same mark: name, format, architecture, size, and a
   badge saying whether anything in this build can read it. That badge is the point
   of the card: "nothing here reads this" is an answer, and silence is not.
 
-The bar carries the state of the thing the page is for, in the place a chat header
-usually puts the model it is talking to: a pill reading **No model**, with no chevron
-because there is no menu behind it.
+The rail carries the product identity and the About link. The conversation has no
+header: the disconnected model state is not useful enough to reserve a row for it.
+On narrow screens, a single floating button opens the conversation-history drawer.
 
-The composer is one capsule: attach, the input, send. Enter sends and Shift+Enter
-starts a line; a touch keyboard's return key is a real newline, because Shift cannot
-be held on glass. A send with nothing to send is a white circle on the tinted
-capsule rather than a bare arrow, because a control that has no container reads as an
-icon that failed to render.
+The composer is one capsule: attach, the input, send, with the active model in a
+small selector above it. Models are grouped by provider; when none exists, the
+selector is itself an invitation to add one. Enter sends and Shift+Enter starts a
+line; a touch keyboard's return key is a real newline, because Shift cannot be held
+on glass. A send with nothing to send is a white circle on the tinted capsule rather
+than a bare arrow, because a control that has no container reads as an icon that
+failed to render.
+
+A **+ Model** action sits at the lower left of the history rail. The dialog has two
+real paths: **API Key** selects a Pi built-in Provider and inherits its model catalog,
+protocol and compatibility metadata; **Custom** accepts an OpenAI-compatible base URL,
+discovers its catalog through `GET /models`, can resynchronise it later, and falls back
+to manual model IDs only when that endpoint is absent. Account/OAuth login is omitted:
+Pi's subscription flows require a local callback or device-code broker, which this
+static browser application deliberately does not run. Provider credentials live in
+IndexedDB and are never copied into a conversation. Each conversation stores only its
+selected provider/model reference.
+
+The active model runs through Pi's browser-safe Agent loop. Its tools are deliberately
+read-only and local: list attached binaries, inspect one, find functions or classes,
+search strings, and decompile a selected function or class. The tools read the OPFS
+copy through Kuna or Rasc and return bounded text; the original binary is never put in
+the model request. The full Pi Coding Agent shell is not embedded because its file,
+process and terminal runtime is Node-specific and would break the browser-only trust
+boundary.
 
 The empty state is the greeting and the composer, and nothing else. An earlier
 version of this page explained itself under both — what runs where, and that no
@@ -133,6 +164,9 @@ on this device. Decoration with a budget — 30 fps, a static frame under
 - Use the standard file input and platform share/file-picker flow.
 - Never require the desktop File System Access API.
 - Detect the format locally from bytes, not only from the file extension.
+- Persist attached binaries locally: OPFS holds the bytes and IndexedDB holds the
+  owning conversation and metadata. Check the site's storage estimate first and
+  request persistent storage; deleting a conversation deletes its owned files.
 - Accept a drop anywhere in the window, and show that the whole screen is the
   target while a file is being carried over it. The drop and the composer's attach
   control run through one code path, so they cannot drift apart in what they accept.

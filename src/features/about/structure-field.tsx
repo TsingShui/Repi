@@ -88,6 +88,8 @@ export interface StructureFieldApi {
 
 export interface StructureFieldProps {
   onReady?: (api: StructureFieldApi) => void;
+  /** A lower-motion treatment for surfaces where the field is not the subject. */
+  variant?: "full" | "quiet";
 }
 
 /**
@@ -117,6 +119,7 @@ function readPalette() {
 
 export function StructureField(props: StructureFieldProps) {
   let started = false;
+  const quiet = props.variant === "quiet";
 
   function start(host: HTMLDivElement) {
     if (started) return;
@@ -211,7 +214,8 @@ export function StructureField(props: StructureFieldProps) {
       const travel = height + height * BAND_RATIO;
       const sweepY = reduceMotion
         ? height * 0.42
-        : (((seconds / SWEEP_SECONDS + SWEEP_PHASE) % 1) * travel) - height * BAND_RATIO * 0.5;
+        : (((seconds / (quiet ? SWEEP_SECONDS * 1.55 : SWEEP_SECONDS) + SWEEP_PHASE) % 1) * travel) -
+          height * BAND_RATIO * 0.5;
       const trailLength = bandHalf * TRAIL_LENGTH;
 
       pointer.x += (pointer.targetX - pointer.x) * 0.06;
@@ -257,18 +261,18 @@ export function StructureField(props: StructureFieldProps) {
         }
 
         if (alpha < 0.005) continue;
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = quiet ? alpha * 0.42 : alpha;
         ctx.fillRect(x, y, CELL, CELL);
       }
 
       // The read head: one hairline that leads the sweep and names what it is.
       if (headGradient) {
-        ctx.globalAlpha = HEAD_ALPHA;
+        ctx.globalAlpha = quiet ? HEAD_ALPHA * 0.35 : HEAD_ALPHA;
         ctx.fillStyle = headGradient;
         ctx.fillRect(0, sweepY - 0.5, width, 1);
       }
 
-      if (reduceMotion) {
+      if (reduceMotion || quiet) {
         ctx.globalAlpha = 1;
         return;
       }
@@ -348,7 +352,7 @@ export function StructureField(props: StructureFieldProps) {
     });
     observer.observe(host);
 
-    host.addEventListener("pointermove", onPointerMove);
+    if (!quiet) host.addEventListener("pointermove", onPointerMove);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     props.onReady?.({
@@ -361,11 +365,18 @@ export function StructureField(props: StructureFieldProps) {
     onCleanup(() => {
       stop();
       observer.disconnect();
-      host.removeEventListener("pointermove", onPointerMove);
+      if (!quiet) host.removeEventListener("pointermove", onPointerMove);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       canvas.remove();
     });
   }
 
-  return <div class="structure-field" aria-hidden="true" ref={start} />;
+  return (
+    <div
+      class="structure-field"
+      data-variant={props.variant ?? "full"}
+      aria-hidden="true"
+      ref={start}
+    />
+  );
 }

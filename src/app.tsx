@@ -1,8 +1,14 @@
-import { createSignal, Match, onCleanup, Switch } from "solid-js";
+import { createSignal, Match, onCleanup, Show, Switch } from "solid-js";
 import { createFinePointer } from "./lib/pointer";
 import { detectFormat } from "./lib/detect-format";
+import { createRepiAgentRuntime } from "./lib/agent/repi-agent";
 import { AboutScreen } from "./features/about/about-screen";
 import { ChatScreen, type ChatLine } from "./features/chat/chat-screen";
+import { ConversationSidebar } from "./features/chat/conversation-sidebar";
+import { createConversationStore } from "./features/chat/conversation-store";
+import { ProviderDialog } from "./features/models/provider-dialog";
+import { createModelStore } from "./features/models/model-store";
+import { modelKey } from "./features/models/types";
 import "./app.css";
 
 /**
@@ -17,16 +23,31 @@ function route(): "about" | null {
 
 export function App() {
   const [page, setPage] = createSignal(route());
-  const [lines, setLines] = createSignal<readonly ChatLine[]>([]);
   const [dragging, setDragging] = createSignal(false);
+  const [sidebarOpen, setSidebarOpen] = createSignal(false);
+  const [providerDialogOpen, setProviderDialogOpen] = createSignal(false);
+  const [agentWorking, setAgentWorking] = createSignal(false);
+  const [fileWrite, setFileWrite] = createSignal<{ readonly name: string; readonly progress: number } | null>(
+    null,
+  );
+  const conversations = createConversationStore();
+  const models = createModelStore();
+  const agentRuntime = createRepiAgentRuntime({ openFile: conversations.openFile });
   const finePointer = createFinePointer();
 
-  const onHashChange = () => setPage(route());
+  const onHashChange = () => {
+    setPage(route());
+    setSidebarOpen(false);
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") setSidebarOpen(false);
+  };
   window.addEventListener("hashchange", onHashChange);
-  onCleanup(() => window.removeEventListener("hashchange", onHashChange));
-
-  const append = (...added: readonly ChatLine[]) =>
-    setLines((current) => [...current, ...added]);
+  window.addEventListener("keydown", onKeyDown);
+  onCleanup(() => {
+    window.removeEventListener("hashchange", onHashChange);
+    window.removeEventListener("keydown", onKeyDown);
+  });
 
   /*
    * Opening a file lives here rather than in a page, because three things open one:
@@ -34,48 +55,112 @@ export function App() {
    * is accepted anywhere in the window. One entry point means the three cannot
    * drift apart in what they accept or in what they say.
    */
+  let acceptingFile = false;
   async function accept(file: File | undefined) {
-    if (!file) return;
+    if (!file || acceptingFile) return;
+    acceptingFile = true;
+
+    // A picker can be used immediately after load. Wait for IndexedDB restoration
+    // before choosing the owner so the file cannot land in the temporary shell row.
+    await conversations.whenReady();
+
+    // Bind an asynchronous format read to the conversation it began in. Switching
+    // history while it runs must not move the resulting card to another thread.
+    const conversationId = conversations.activeId();
 
     // Whatever surface it came from, it belongs in the conversation. Going there
     // first means the file card appears where the user is already looking.
     window.location.hash = "";
 
     try {
-      const format = await detectFormat(file);
-      append({
-        kind: "file",
-        name: file.name,
-        size: file.size,
-        format: format.label,
-        detail: format.detail,
-        engine: format.engine,
-      });
-    } catch {
-      append({
-        kind: "note",
-        text: "The browser could not read this file. It may have been moved or removed.",
-      });
+      let format;
+      try {
+        format = await detectFormat(file);
+      } catch {
+        conversations.appendTo(conversationId, [{
+          kind: "note",
+          text: "The browser could not read this file. It may have been moved or removed.",
+        }]);
+        return;
+      }
+
+      try {
+        setFileWrite({ name: file.name, progress: 0 });
+        const storedFileId = await conversations.saveFile(conversationId, file, (written) => {
+          const progress = file.size === 0 ? 1 : Math.min(1, written / file.size);
+          setFileWrite({ name: file.name, progress });
+        });
+        conversations.appendTo(conversationId, [{
+          kind: "file",
+          name: file.name,
+          size: file.size,
+          format: format.label,
+          detail: format.detail,
+          engine: format.engine,
+          storedFileId,
+        }]);
+      } catch {
+        conversations.appendTo(conversationId, [{
+          kind: "note",
+          text: `Repi recognised ${file.name}, but could not save it locally. Check the available browser storage and try again.`,
+        }]);
+      }
+    } finally {
+      acceptingFile = false;
+      setFileWrite(null);
     }
   }
 
-  /*
-   * Nothing answers yet, and the transcript says so once rather than leaving a send
-   * that visibly does nothing. This line is the placeholder for an answer: it is
-   * where a model's reply appears, with the sentence removed, and it is deliberately
-   * not repeated after the first send.
-   */
-  let saidNothingAnswers = false;
-  function send(text: string) {
-    const added: ChatLine[] = [{ kind: "you", text }];
-    if (!saidNothingAnswers) {
-      saidNothingAnswers = true;
-      added.push({
-        kind: "note",
-        text: "Nothing is connected to this conversation yet, so this message stayed on this device and nothing answered.",
+  const agentErrorMessage = (raw: string) =>
+    raw.startsWith("Connection error")
+      ? "Could not reach the model provider. Check its Base URL, API key, and browser CORS settings."
+      : raw;
+
+  async function send(text: string) {
+    if (agentWorking()) return;
+    setAgentWorking(true);
+    let runIds: { readonly conversationId: string; readonly lineId: string } | null = null;
+
+    try {
+      await Promise.all([conversations.whenReady(), models.whenReady()]);
+      const conversation = conversations.active();
+      const lineId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      runIds = { conversationId: conversation.id, lineId };
+      const added: ChatLine[] = [
+        { kind: "you", text },
+        { kind: "assistant", id: lineId, text: "", state: "streaming" },
+      ];
+      conversations.appendTo(conversation.id, added);
+      const result = await agentRuntime.run(conversation, models.providers(), text, {
+        onText: (answer) => {
+          conversations.updateAssistant(conversation.id, lineId, { text: answer });
+        },
+        onActivity: (activity) => {
+          conversations.updateAssistant(conversation.id, lineId, { activity: activity ?? "" });
+        },
       });
+      conversations.updateAssistant(conversation.id, lineId, {
+        text: result.error
+          ? agentErrorMessage(result.error)
+          : (result.text || "The model returned no text."),
+        state: result.error ? "error" : "complete",
+        activity: "",
+      });
+      conversations.setAgentMessages(conversation.id, result.messages);
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "The agent could not start.";
+      const message = agentErrorMessage(raw);
+      if (runIds) {
+        const finalConversation = conversations.updateAssistant(runIds.conversationId, runIds.lineId, {
+          text: message,
+          state: "error",
+          activity: "",
+        });
+        if (finalConversation) conversations.persistConversation(finalConversation);
+      }
+    } finally {
+      setAgentWorking(false);
     }
-    append(...added);
   }
 
   // Depth counter, because dragenter fires again for every child the pointer
@@ -125,15 +210,85 @@ export function App() {
   });
 
   return (
-    <div class="app" data-pointer={finePointer() ? "fine" : "coarse"}>
-      <Switch>
-        <Match when={page() === "about"}>
-          <AboutScreen onClose={() => (window.location.hash = "")} />
-        </Match>
-        <Match when={true}>
-          <ChatScreen lines={lines()} onSend={send} onPick={(file) => void accept(file)} />
-        </Match>
-      </Switch>
+    <div
+      class="app"
+      data-page={page() === "about" ? "about" : "chat"}
+      data-pointer={finePointer() ? "fine" : "coarse"}
+    >
+      <Show when={page() !== "about"}>
+        <ConversationSidebar
+          conversations={conversations.conversations()}
+          activeId={conversations.activeId()}
+          open={sidebarOpen()}
+          ready={conversations.ready()}
+          storageError={conversations.storageError()}
+          usage={conversations.usage()}
+          onNew={() => {
+            conversations.start();
+            setSidebarOpen(false);
+          }}
+          onSelect={(id) => {
+            conversations.select(id);
+            setSidebarOpen(false);
+          }}
+          onDelete={(id) => {
+            const conversation = conversations.conversations().find((item) => item.id === id);
+            if (conversation) agentRuntime.disposeConversation(conversation);
+            conversations.remove(id);
+          }}
+          onAddProvider={() => {
+            setSidebarOpen(false);
+            setProviderDialogOpen(true);
+          }}
+          onClose={() => setSidebarOpen(false)}
+        />
+      </Show>
+
+      <div class="app-main">
+        <Switch>
+          <Match when={page() === "about"}>
+            <AboutScreen onClose={() => (window.location.hash = "")} />
+          </Match>
+          <Match when={true}>
+            <ChatScreen
+              conversationId={conversations.activeId()}
+              lines={conversations.active().lines}
+              onSend={(text) => void send(text)}
+              working={agentWorking()}
+              onStop={agentRuntime.abort}
+              onPick={(file) => void accept(file)}
+              fileWrite={fileWrite()}
+              providers={models.providers()}
+              selectedModelKey={conversations.active().selectedModelKey ?? null}
+              onSelectModel={conversations.selectModel}
+              onAddProvider={() => setProviderDialogOpen(true)}
+              onOpenSidebar={() => setSidebarOpen(true)}
+            />
+          </Match>
+        </Switch>
+      </div>
+
+      <ProviderDialog
+        open={providerDialogOpen()}
+        providers={models.providers()}
+        onClose={() => setProviderDialogOpen(false)}
+        onSave={async (provider) => {
+          const added = await models.add(provider);
+          await conversations.whenReady();
+          conversations.selectModel(modelKey(added.id, added.models[0]!));
+        }}
+        onRefresh={async (id, availableModels) => {
+          const updated = await models.updateModels(id, availableModels);
+          const selected = conversations.active().selectedModelKey;
+          if (!selected || !availableModels.some((model) => modelKey(id, model) === selected)) {
+            conversations.selectModel(modelKey(updated.id, updated.models[0]!));
+          }
+        }}
+        onDelete={async (id) => {
+          await models.remove(id);
+          conversations.clearProviderSelection(id);
+        }}
+      />
 
       {/* Covers the whole screen, because the drop is accepted anywhere on it. */}
       <div class="drop-glow" data-active={dragging() ? "true" : "false"} aria-hidden="true" />

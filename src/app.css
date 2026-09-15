@@ -1,19 +1,43 @@
 /*
- * Application shell. One full-height column: a top bar that belongs to the
- * active screen, then the screen content. The structure field is an absolutely
- * positioned layer behind both, so it never scrolls with the content.
+ * Application shell. The conversation adds a history rail beside its surface;
+ * reading pages use the whole viewport. The structure field is an absolutely
+ * positioned layer inside the main surface, so it never scrolls with the content.
  */
 
 .app {
   position: relative;
   display: grid;
-  /* Without this the column is sized to its content, and the tab strip's
-     min-content — the sum of every open tab — pushes the whole app wider than
-     the viewport. `minmax(0, 1fr)` lets the strip scroll instead. */
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "sidebar main";
+  grid-template-columns: 264px minmax(0, 1fr);
   height: 100dvh;
-  grid-template-rows: auto 1fr;
+  overflow: hidden;
   background: var(--canvas);
+}
+
+.app[data-page="about"] {
+  display: block;
+}
+
+.app-main {
+  grid-area: main;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.app[data-page="chat"] .app-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+@media (max-width: 760px) {
+  .app {
+    grid-template-areas: "main";
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ========================================================== drop target */
@@ -206,4 +230,43 @@
 
 .top-bar-link-arrow {
   font-size: 11px;
+}
+
+/* Mobile keeps one floating way into the off-canvas history without reserving
+ * an otherwise empty application bar. */
+.sidebar-trigger {
+  position: absolute;
+  z-index: 4;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 12px;
+  display: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 0;
+  background: var(--canvas);
+  color: var(--ink-muted);
+  box-shadow: var(--shadow-raised);
+}
+
+.sidebar-trigger:hover {
+  background: var(--canvas-raised);
+  color: var(--ink);
+}
+
+.sidebar-trigger svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+@media (max-width: 760px) {
+  .sidebar-trigger {
+    display: grid;
+  }
 }

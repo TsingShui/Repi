@@ -1,32 +1,27 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { BrandMark } from "../../components/brand-mark";
+import { Markdown } from "../../components/markdown";
 import { formatBytes, type EngineId } from "../../lib/detect-format";
+import { StructureField } from "../about/structure-field";
+import { ModelSelector } from "../models/model-selector";
+import type { ModelProvider } from "../models/types";
+import type { ChatLine } from "./types";
 import "./chat-screen.css";
 
-/** One thing in the transcript, in the order it happened. */
-export type ChatLine =
-  /** What the user typed or dropped. */
-  | { readonly kind: "you"; readonly text: string }
-  /**
-   * The application speaking about itself: what it recognised, what it cannot do,
-   * what it is waiting for. It is not a model's answer, and the transcript tells
-   * them apart rather than letting the two blur.
-   */
-  | { readonly kind: "note"; readonly text: string }
-  | {
-      readonly kind: "file";
-      readonly name: string;
-      readonly size: number;
-      readonly format: string;
-      readonly detail: string;
-      /** The analyser that can read this file, or null when nothing here can. */
-      readonly engine: EngineId | null;
-    };
+export type { ChatLine } from "./types";
 
 export interface ChatScreenProps {
+  readonly conversationId: string;
   readonly lines: readonly ChatLine[];
   readonly onSend: (text: string) => void;
+  readonly working: boolean;
+  readonly onStop: () => void;
   readonly onPick: (file: File | undefined) => void;
+  readonly fileWrite: { readonly name: string; readonly progress: number } | null;
+  readonly providers: readonly ModelProvider[];
+  readonly selectedModelKey: string | null;
+  readonly onSelectModel: (key: string) => void;
+  readonly onAddProvider: () => void;
+  readonly onOpenSidebar: () => void;
 }
 
 /** Spelled out, so a third engine is a type error rather than a silent "undefined". */
@@ -50,11 +45,15 @@ function analyserSentence(engine: EngineId | null): string {
  * A component rather than a shared JSX value: a JSX value is a real DOM node, so
  * rendering the same one in two places would move it out of the first.
  */
-function FileInput(props: { readonly onPick: (file: File | undefined) => void }) {
+function FileInput(props: {
+  readonly onPick: (file: File | undefined) => void;
+  readonly disabled: boolean;
+}) {
   return (
     <input
       class="visually-hidden"
       type="file"
+      disabled={props.disabled}
       onChange={(event) => {
         const picked = event.currentTarget.files?.[0];
         event.currentTarget.value = "";
@@ -87,13 +86,27 @@ export function ChatScreen(props: ChatScreenProps) {
    * telling "user scrolled up" apart from "user is at the end".
    */
   createEffect(
-    () => props.lines.length,
+    () => `${props.conversationId}:${props.lines.length}`,
     () => {
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
   );
 
-  const canSend = () => text().trim().length > 0;
+  // A draft belongs to the thread where it was typed. Until drafts are stored per
+  // conversation, clearing it is safer than showing it under a different history row.
+  createEffect(
+    () => props.conversationId,
+    () => {
+      setText("");
+      if (input) input.style.height = "auto";
+    },
+  );
+
+  const selectedModelExists = () =>
+    props.providers.some((provider) =>
+      provider.models.some((model) => `${provider.id}:${model}` === props.selectedModelKey),
+    );
+  const canSend = () => text().trim().length > 0 && selectedModelExists() && !props.working;
 
   const grow = () => {
     if (!input) return;
@@ -104,7 +117,7 @@ export function ChatScreen(props: ChatScreenProps) {
 
   const submit = () => {
     const value = text().trim();
-    if (!value) return;
+    if (!value || !canSend()) return;
     props.onSend(value);
     setText("");
     if (input) {
@@ -119,30 +132,20 @@ export function ChatScreen(props: ChatScreenProps) {
    */
 
   return (
-    <>
-      <header class="top-bar">
-        <div class="top-bar-group">
-          <BrandMark />
-          <span class="brand-name">Repi</span>
-          {/*
-            The state of the thing the page is for, where a chat header usually puts
-            the model it is talking to. A pill and not a control: there is no menu
-            behind it, and no chevron pretending there is.
-          */}
-          <span class="model-pill" data-testid="model-pill">
-            <span class="model-dot" aria-hidden="true" />
-            No model
-          </span>
-        </div>
-        <nav class="top-bar-links" aria-label="About this project">
-          <a class="top-bar-link" href="#/about" data-testid="about-link">
-            About
-          </a>
-        </nav>
-      </header>
+    <main class="chat" data-empty={empty() ? "true" : "false"}>
+      <button
+        class="sidebar-trigger"
+        type="button"
+        aria-label="Open conversation history"
+        onClick={props.onOpenSidebar}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <StructureField variant="quiet" />
 
-      <main class="chat" data-empty={empty() ? "true" : "false"}>
-        <div class="chat-scroll" ref={scroller}>
+      <div class="chat-scroll" ref={scroller}>
           <div class="chat-column" role="log" aria-live="polite" data-testid="transcript">
             <Show when={empty()}>
               <section class="chat-welcome">
@@ -156,7 +159,7 @@ export function ChatScreen(props: ChatScreenProps) {
               {(line) => (
                 <div class="line" data-kind={line.kind}>
                   {/*
-                    Three `Show`s rather than a `Switch`: the accessor form narrows
+                    Separate `Show`s rather than a `Switch`: the accessor form narrows
                     the union, so each branch reads its own fields without a cast.
                   */}
                   <Show when={line.kind === "you" ? line : null}>
@@ -177,6 +180,28 @@ export function ChatScreen(props: ChatScreenProps) {
                     )}
                   </Show>
 
+                  <Show when={line.kind === "assistant" ? line : null}>
+                    {(assistant) => (
+                      <div class="line-repi">
+                        <span class="line-avatar" aria-hidden="true">
+                          R
+                        </span>
+                        <div class="line-body">
+                          <p class="line-from">Repi</p>
+                          <Show when={assistant().activity}>
+                            {(activity) => <p class="line-activity">{activity()}</p>}
+                          </Show>
+                          <Show when={assistant().text} fallback={<span class="typing-indicator" aria-label="Thinking" />}>
+                            <Markdown
+                              text={assistant().text}
+                              error={assistant().state === "error"}
+                            />
+                          </Show>
+                        </div>
+                      </div>
+                    )}
+                  </Show>
+
                   <Show when={line.kind === "file" ? line : null}>
                     {(file) => (
                       <div class="line-repi">
@@ -189,7 +214,12 @@ export function ChatScreen(props: ChatScreenProps) {
                             <p class="file-facts">
                               {file().format} · {file().detail} · {formatBytes(file().size)}
                             </p>
-                            <p class="file-badge">{analyserSentence(file().engine)}</p>
+                            <div class="file-badges">
+                              <p class="file-badge">{analyserSentence(file().engine)}</p>
+                              <Show when={file().storedFileId}>
+                                <p class="file-badge file-stored">Saved locally</p>
+                              </Show>
+                            </div>
                           </article>
                         </div>
                       </div>
@@ -202,6 +232,17 @@ export function ChatScreen(props: ChatScreenProps) {
         </div>
 
         <div class="composer-column">
+          <Show when={props.fileWrite}>
+            {(write) => (
+              <div class="file-write" role="status" aria-live="polite">
+                <span class="file-write-name">Saving {write().name}</span>
+                <span class="file-write-value">{Math.round(write().progress * 100)}%</span>
+                <span class="file-write-track" aria-hidden="true">
+                  <span style={{ width: `${write().progress * 100}%` }} />
+                </span>
+              </div>
+            )}
+          </Show>
           <form
             class="composer"
             onSubmit={(event) => {
@@ -210,13 +251,6 @@ export function ChatScreen(props: ChatScreenProps) {
             }}
           >
             <div class="composer-box">
-              <label class="composer-attach" aria-label="Attach a binary">
-                <FileInput onPick={props.onPick} />
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </label>
-
               <textarea
                 class="composer-input"
                 ref={(node) => (input = node)}
@@ -239,21 +273,55 @@ export function ChatScreen(props: ChatScreenProps) {
                 }}
               />
 
-              <button
-                class="composer-send"
-                type="submit"
-                disabled={!canSend()}
-                aria-label="Send"
-                data-testid="send"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
+              <div class="composer-actions">
+                <div class="composer-actions-start">
+                  <label
+                    class="composer-attach"
+                    data-disabled={props.fileWrite || props.working ? "true" : "false"}
+                    aria-label="Attach a binary"
+                  >
+                    <FileInput
+                      onPick={props.onPick}
+                      disabled={props.fileWrite !== null || props.working}
+                    />
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </label>
+                  <ModelSelector
+                    providers={props.providers}
+                    selectedKey={props.selectedModelKey}
+                    onSelect={props.onSelectModel}
+                    onAddProvider={props.onAddProvider}
+                  />
+                </div>
+
+                <Show
+                  when={props.working}
+                  fallback={
+                    <button
+                      class="composer-send"
+                      type="submit"
+                      disabled={!canSend()}
+                      aria-label={selectedModelExists() ? "Send" : "Choose a model before sending"}
+                      data-testid="send"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 19V5M5 12l7-7 7 7" />
+                      </svg>
+                    </button>
+                  }
+                >
+                  <button class="composer-send composer-stop" type="button" aria-label="Stop" onClick={props.onStop}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="7" y="7" width="10" height="10" />
+                    </svg>
+                  </button>
+                </Show>
+              </div>
             </div>
           </form>
         </div>
-      </main>
-    </>
+    </main>
   );
 }
