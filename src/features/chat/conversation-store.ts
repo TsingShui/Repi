@@ -174,6 +174,39 @@ export function createConversationStore() {
     return updated;
   };
 
+  /**
+   * Every binary the user has attached, in any conversation.
+   *
+   * The storage is shared, so a file the user uploaded once is a file this app has: hiding it from
+   * the next conversation would mean uploading the same APK again to ask a second question about
+   * it. What is shared is the file and its id — a program still runs against one binary at a time,
+   * which is a contract about memory rather than about ownership.
+   */
+  const listAttachmentFiles = async (): Promise<readonly StoredFile[]> =>
+    (await storage.listFiles()).filter((record) => record.origin === "attachment");
+
+  const updateTool = (
+    conversationId: string,
+    lineId: string,
+    patch: Partial<Extract<ChatLine, { kind: "tool" }>>,
+  ) => {
+    let updated: Conversation | undefined;
+    setConversations((current) =>
+      current.map((conversation) => {
+        if (conversation.id !== conversationId) return conversation;
+        updated = {
+          ...conversation,
+          updatedAt: Date.now(),
+          lines: conversation.lines.map((line) =>
+            line.kind === "tool" && line.id === lineId ? { ...line, ...patch } : line,
+          ),
+        };
+        return updated;
+      }),
+    );
+    return updated;
+  };
+
   const persistConversation = (conversation: Conversation) => {
     enqueue(() => storage.putConversation(conversation));
   };
@@ -384,6 +417,8 @@ export function createConversationStore() {
     updateAssistant,
     persistConversation,
     setAgentMessages,
+    listAttachmentFiles,
+    updateTool,
     start,
     select,
     selectModel,

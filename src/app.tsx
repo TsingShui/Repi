@@ -69,7 +69,13 @@ function MainApp() {
         conversations.saveVirtualFile(path, bytes, conversationId),
       stat: (path) => conversations.statVirtualFile(path),
       read: (path) => conversations.readVirtualFile(path),
+      describe: async () => (
+        await conversations.listDerivedFiles()
+      ).flatMap((record) => (record.path === undefined ? [] : [{ path: record.path, bytes: record.size }])),
     },
+    attachments: async () => (
+      await conversations.listAttachmentFiles()
+    ).map((record) => ({ id: record.id, name: record.name, bytes: record.size })),
     // The agent drives the same session the dialog shows; see the store's `bridge`.
     device: devices.bridge,
   });
@@ -118,23 +124,24 @@ function MainApp() {
    * moment ago did not exist.
    */
   const [derivedFiles, setDerivedFiles] = createSignal<readonly StoredFile[]>([]);
+  const [attachedFiles, setAttachedFiles] = createSignal<readonly StoredFile[]>([]);
   createEffect(
     () => [conversations.activeId(), conversations.active().lines.length, conversations.usage()] as const,
     () => {
       void conversations.listDerivedFiles().then(setDerivedFiles);
+      void conversations.listAttachmentFiles().then(setAttachedFiles);
     },
   );
   const mentionTargets = (): readonly MentionTarget[] => {
-    const attached = conversations
-      .active()
-      .lines.filter((line) => line.kind === "file")
-      .map((line) => ({
-        id: line.name,
-        name: line.name,
-        kind: "attachment" as const,
-        bytes: line.size,
-        ...(line.storedFileId ? { fileId: line.storedFileId } : {}),
-      }));
+    // Every upload, not this conversation's: the filesystem is shared, and someone who attached an
+    // APK an hour ago should be able to point at it now without attaching it again.
+    const attached = attachedFiles().map((record) => ({
+      id: record.name,
+      name: record.name,
+      kind: "attachment" as const,
+      bytes: record.size,
+      fileId: record.id,
+    }));
     const derived = derivedFiles().flatMap((record) =>
       record.path === undefined
         ? []
@@ -318,11 +325,30 @@ function MainApp() {
         onText: (answer) => {
           conversations.updateAssistant(conversation.id, lineId, { text: answer });
         },
+        // Thinking streams into the line as it is produced: the wait is then visible as work
+        // rather than as a stall.
+        onThinking: (thinking) => {
+          conversations.updateAssistant(conversation.id, lineId, { thinking });
+        },
         onActivity: (activity) => {
           conversations.updateAssistant(conversation.id, lineId, { activity: activity ?? "" });
         },
         // Live, because a turn is several requests and the meter should be right during one.
         onUsage: (usage) => setLiveUsage(usage.totalTokens),
+        // Every tool call becomes a line of its own as it happens, so the work is visible while
+        // it is happening rather than only in its conclusion.
+        onToolStart: (call) => {
+          conversations.appendTo(conversation.id, [
+            { kind: "tool", id: call.id, name: call.name, summary: call.summary, state: "running" },
+          ]);
+        },
+        onToolEnd: (call) => {
+          conversations.updateTool(conversation.id, call.id, {
+            state: call.isError ? "error" : "done",
+            result: call.text,
+            bytes: call.bytes,
+          });
+        },
       }, mentions);
       conversations.updateAssistant(conversation.id, lineId, {
         text: result.error

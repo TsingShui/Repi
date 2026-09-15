@@ -12,6 +12,32 @@ export type ChatLine =
       readonly text: string;
       readonly state: "streaming" | "complete" | "error";
       readonly activity?: string;
+      /**
+       * What the model thought before answering, when it says so.
+       *
+       * Kept with the message because it is part of how the answer was reached: a reader can
+       * disagree with a conclusion and agree with the reasoning, or the reverse, and neither is
+       * possible if only the conclusion survives.
+       */
+      readonly thinking?: string;
+    }
+  | {
+      /**
+       * One tool call, as it happened.
+       *
+       * Shown rather than collapsed into an activity label: what the agent did is the substance of
+       * an analysis, and a transcript that hides it leaves the user watching a spinner and then a
+       * conclusion they cannot check.
+       */
+      readonly kind: "tool";
+      readonly id: string;
+      readonly name: string;
+      /** One line about what it was called on. */
+      readonly summary: string;
+      readonly state: "running" | "done" | "error";
+      /** What it answered, bounded by the tool's own limit. */
+      readonly result?: string;
+      readonly bytes?: number;
     }
   | {
       readonly kind: "file";

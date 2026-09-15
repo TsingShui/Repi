@@ -43,6 +43,53 @@ await page.evaluate(async () => {
   }
   const models = Array.from({ length: 24 }, (_, index) => `model-${String(index).padStart(2, "0")}`);
   const transaction = database.transaction(["providers"], "readwrite");
+  // Two conversations, and the upload is in the *other* one: the question this checks is whether a
+  // binary the user attached earlier is still a binary now.
+  const conversations = database
+    .transaction(["conversations"], "readwrite")
+    .objectStore("conversations");
+  conversations.clear();
+  conversations.put({
+    id: "c-other",
+    title: "earlier",
+    updatedAt: Date.now() - 1000,
+    selectedModelKey: "seed-provider:model-00",
+    lines: [
+      { kind: "you", text: "here is an apk" },
+      {
+        kind: "file",
+        name: "earlier-upload.apk",
+        size: 126074821,
+        format: "APK",
+        detail: "DEX",
+        engine: "rasc",
+        storedFileId: "stored-1",
+      },
+    ],
+  });
+  conversations.put({
+    id: "c-now",
+    title: "now",
+    updatedAt: Date.now(),
+    selectedModelKey: "seed-provider:model-00",
+    lines: [{ kind: "you", text: "a question in a new conversation" }],
+  });
+  // The attachment's own record, which is what makes it a file rather than a line about one.
+  database
+    .transaction(["files"], "readwrite")
+    .objectStore("files")
+    .put({
+      id: "stored-1",
+      conversationId: "c-other",
+      name: "earlier-upload.apk",
+      type: "application/octet-stream",
+      size: 126074821,
+      lastModified: Date.now(),
+      createdAt: Date.now(),
+      backend: "opfs",
+      origin: "attachment",
+    });
+
   transaction.objectStore("providers").put({
     id: "seed-provider",
     kind: "custom",
@@ -201,9 +248,10 @@ await page.waitForTimeout(200);
     menu.top >= 0 && menu.bottom <= menu.viewport,
     `${menu.direction} top=${menu.top} bottom=${menu.bottom}`,
   );
+  // The rule, not a direction: it flips only when the room below cannot hold it.
   check(
-    "and not flipped, because this one has room below",
-    menu.direction === "down" && menu.roomBelow > menu.height,
+    "and it flipped exactly when it had to",
+    menu.direction === "up" ? menu.roomBelow < menu.height : menu.roomBelow >= menu.height,
     `${menu.direction} room below=${menu.roomBelow} height=${menu.height}`,
   );
 
@@ -223,6 +271,30 @@ await page.waitForTimeout(200);
   });
   check("the choice is remembered with the conversation", stored.includes("high"), stored.join(", "));
   check("and it reads back as the current level", (await page.locator(".thinking-trigger").innerText()).includes("high"));
+}
+
+// The `@` menu, and the file that lives in another conversation.
+{
+  await page.click(".composer-input");
+  await page.type(".composer-input", "@earlier");
+  await page.waitForSelector(".mention-menu", { timeout: 10_000 });
+  await page.waitForTimeout(200);
+  const rows = await page.locator(".mention-option").allInnerTexts();
+  check(
+    "an upload from another conversation can be pointed at",
+    rows.some((row) => row.includes("earlier-upload.apk")),
+    rows.join(" | ") || "(nothing offered)",
+  );
+  check(
+    "and the menu says how big it is, because that is the fact that matters about an APK",
+    rows.some((row) => /\d+(\.\d+)? MB/.test(row)),
+    rows.join(" | "),
+  );
+  // Take it, and the message should carry the name the menu wrote.
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(150);
+  const typed = await page.inputValue(".composer-input");
+  check("taking it writes its name into the message", typed.includes("@earlier-upload.apk"), typed);
 }
 
 // A refresh is where this went wrong once: the conversation came back from storage before the
@@ -245,9 +317,10 @@ check(
 await page.evaluate(async () => {
   const request = indexedDB.open("repi-workspace");
   const database = await new Promise((resolve) => (request.onsuccess = () => resolve(request.result)));
-  const transaction = database.transaction(["providers", "conversations"], "readwrite");
+  const transaction = database.transaction(["providers", "conversations", "files"], "readwrite");
   transaction.objectStore("providers").delete("seed-provider");
   transaction.objectStore("conversations").clear();
+  transaction.objectStore("files").clear();
   await new Promise((resolve) => (transaction.oncomplete = resolve));
   database.close();
 });

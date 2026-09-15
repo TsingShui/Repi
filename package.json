@@ -20,7 +20,8 @@
     "check:model": "node ./scripts/run-analysis-check.mjs model-facts-check",
     "check:mentions": "node ./scripts/run-analysis-check.mjs mention-check",
     "check:files": "node ./scripts/run-analysis-check.mjs text-files-check",
-    "check:compaction": "node ./scripts/run-analysis-check.mjs compaction-check"
+    "check:compaction": "node ./scripts/run-analysis-check.mjs compaction-check",
+    "check:tools": "node ./scripts/run-analysis-check.mjs tool-summary-check"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",

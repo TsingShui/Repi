@@ -24,6 +24,7 @@ import type { SandboxOutcome } from "./quickjs-sandbox";
 import { customModel, resolveThinkingLevel } from "../../features/models/model-facts";
 import { deviceParagraph, deviceTools } from "./device-tools";
 import { fileTools } from "./file-tools";
+import { toolSummary } from "./tool-summary";
 import {
   COMPACTION,
   needsCompaction,
@@ -39,6 +40,11 @@ const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a br
 You inspect the user's attached binary by writing short JavaScript programs with run_js. The
 program runs on the user's device, beside the analyser, and only what it prints or returns
 comes back to you — the binary never leaves the machine and never enters this conversation.
+
+Everything the app holds is reachable from here: the binaries the user uploaded (in this
+conversation or any other — the filesystem is shared, and list_binaries reports every one with the
+id run_js takes) and everything a program has produced. What is not shared is attention: one
+program runs against one binary, so pick the id you mean.
 
 You have a filesystem, and it keeps things. \`write\` stores text under a path — a script you
 are about to run twice, a listing you computed, a note worth keeping — and \`read\` opens one
@@ -81,6 +87,30 @@ export interface AgentRunCallbacks {
    * user should be able to see rather than infer from a gap.
    */
   readonly onCompacted?: (outcome: CompactionOutcome) => void;
+  /** A tool call has started. The transcript shows it rather than a spinner that says nothing. */
+  /**
+   * What the model is thinking, as it thinks it.
+   *
+   * Reported while it happens rather than with the answer, because thinking is the part of a slow
+   * turn that tells the user whether the model understood the question — and a transcript that
+   * shows only the conclusion makes a reasoning model look like a slow one.
+   */
+  readonly onThinking?: (text: string) => void;
+  readonly onToolStart?: (call: { readonly id: string; readonly name: string; readonly summary: string }) => void;
+  /**
+   * It answered.
+   *
+   * The text is whatever the tool returned, which for an engine call is the interesting part and
+   * can be tens of kilobytes: the caller decides how much of it to show, because how much fits is
+   * a question about a screen rather than about a tool.
+   */
+  readonly onToolEnd?: (call: {
+    readonly id: string;
+    readonly name: string;
+    readonly text: string;
+    readonly bytes: number;
+    readonly isError: boolean;
+  }) => void;
 }
 
 /** A file the user pointed at with `@`, resolved before the run starts. */
@@ -121,7 +151,21 @@ export interface RepiAgentRuntimeOptions {
      */
     stat(path: string): Promise<number | null>;
     read(path: string): Promise<Uint8Array | null>;
+    /** What is in the shared filesystem, by path and size, without reading any of it. */
+    describe(): Promise<readonly { readonly path: string; readonly bytes: number }[]>;
   };
+
+  /**
+   * Every binary the user has attached, in any conversation, by id.
+   *
+   * The filesystem is shared, and so are the files in it: a binary uploaded once is available to
+   * every conversation, which is why a program takes a `fileId` rather than a conversation. What
+   * stays per-run is which one a program is mounted against — one archive at a time is about
+   * memory, not about ownership.
+   */
+  readonly attachments: () => Promise<
+    readonly { readonly id: string; readonly name: string; readonly bytes: number }[]
+  >;
   /**
    * The Android device, when one is attached. Absent in a build without WebUSB.
    *
@@ -238,9 +282,6 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
   const loaded = new Map<string, Promise<Loaded>>();
   let activeAgent: Agent | null = null;
 
-  const fileLine = (conversation: Conversation, fileId: string) =>
-    conversation.lines.find((line) => line.kind === "file" && line.storedFileId === fileId);
-
   /**
    * Opens the engine for one attached binary, once per conversation.
    *
@@ -273,9 +314,16 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     if (known) return known;
 
     const task = (async () => {
-      const line = fileLine(conversation, fileId);
-      if (!line || line.kind !== "file") throw new Error("That binary is not attached to this conversation.");
-      const file = await options.openFile(fileId);
+      // Any stored binary, not only one attached to this conversation: the filesystem is shared,
+      // and the id is the address. A file the user attached yesterday is a file they can ask about
+      // today without uploading it again.
+      const file = await options.openFile(fileId).catch(() => null);
+      if (file === null) {
+        throw new Error(
+          "No binary has that id. The list comes from list_binaries, which reports every binary " +
+            "the app is holding.",
+        );
+      }
       const format = await detectFormat(file);
 
       /*
@@ -349,23 +397,35 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     {
       name: "list_binaries",
       label: "List binaries",
-      description: "List binaries attached to this conversation and their local file IDs.",
+      description: `List every binary the app is holding, and what is in the shared filesystem.
+
+The app has one filesystem and one set of uploads: a binary attached in another conversation is
+still a binary, with the same id, and a file a program produced is there for every conversation
+that comes after. What is not shared is attention — a program runs against one binary at a time
+(\`run_js\`'s fileId) — so this is the list to choose from, whatever the conversation was about.`,
       parameters: Type.Object({}),
       async execute() {
-        const files = conversation.lines
-          .filter((line) => line.kind === "file")
-          .map((line) => ({
-            fileId: line.storedFileId ?? null,
-            name: line.name,
-            size: line.size,
-            format: line.format,
-            architecture: line.detail,
-            analyser: line.engine,
-            availableToTools: line.storedFileId !== undefined,
-          }));
+        const [attachments, shared] = await Promise.all([
+          options.attachments().catch(() => []),
+          options.vfs.describe().catch(() => []),
+        ]);
         return {
-          content: [{ type: "text", text: toolText({ files }) }],
-          details: { count: files.length },
+          content: [
+            {
+              type: "text",
+              text: toolText({
+                binaries: attachments.map((file) => ({
+                  fileId: file.id,
+                  name: file.name,
+                  bytes: file.bytes,
+                  // Which conversation it arrived in is not part of the answer: it is the same
+                  // file either way, and saying so invites the idea that it might not be.
+                })),
+                filesystem: shared.map((file) => ({ path: file.path, bytes: file.bytes })),
+              }),
+            },
+          ],
+          details: { binaries: attachments.length, files: shared.length },
         };
       },
     },
@@ -511,6 +571,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
 
     let completedText = "";
     let currentText = "";
+    let currentThinking = "";
     let finalError: string | null = null;
     let turns = 0;
     /** Set when a turn ended because the context filled: the run continues after compacting. */
@@ -552,18 +613,38 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     const unsubscribe = agent.subscribe((event) => {
       if (event.type === "message_start" && event.message.role === "assistant") {
         currentText = "";
+        currentThinking = "";
       } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         currentText += event.assistantMessageEvent.delta;
         callbacks.onText(visibleText());
         callbacks.onActivity(undefined);
       } else if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_start") {
-        // Thinking is invisible in the transcript, so the one thing the user needs to know is
-        // that the wait is work rather than a stall.
+        // Before the first token arrives, the activity line is the only sign that the wait is
+        // work; once the text is in the transcript, the text is the sign.
         callbacks.onActivity("Thinking…");
-      } else if (event.type === "tool_execution_start") {
-        callbacks.onActivity(`Using ${event.toolName.replaceAll("_", " ")}…`);
-      } else if (event.type === "tool_execution_end") {
+      } else if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_delta") {
+        currentThinking += event.assistantMessageEvent.delta;
+        callbacks.onThinking?.(currentThinking);
         callbacks.onActivity(undefined);
+      } else if (event.type === "tool_execution_start") {
+        callbacks.onToolStart?.({
+          id: event.toolCallId,
+          name: event.toolName,
+          summary: toolSummary(event.toolName, event.args),
+        });
+      } else if (event.type === "tool_execution_end") {
+        const result = event.result as { content?: readonly { type: string; text?: string }[] } | undefined;
+        const text = (result?.content ?? [])
+          .filter((part) => part.type === "text" && typeof part.text === "string")
+          .map((part) => part.text ?? "")
+          .join("\n");
+        callbacks.onToolEnd?.({
+          id: event.toolCallId,
+          name: event.toolName,
+          text,
+          bytes: text.length,
+          isError: event.isError === true,
+        });
       } else if (event.type === "message_end" && event.message.role === "assistant") {
         if (event.message.usage) callbacks.onUsage?.(event.message.usage);
         const complete = assistantText(event.message);

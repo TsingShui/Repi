@@ -7,6 +7,8 @@ import { ThinkingSelector } from "../models/thinking-selector";
 import { ContextMeter } from "./context-meter";
 import { applyMenuPlacement, placeMenu } from "../../lib/menu-placement";
 import { MentionMenu } from "./mention-menu";
+import { ToolLine } from "./tool-line";
+import { ThinkingBlock } from "./thinking-block";
 import {
   insertMention,
   matchMentions,
@@ -339,13 +341,7 @@ export function ChatScreen(props: ChatScreenProps) {
                   <Show when={line.kind === "note" ? line : null}>
                     {(note) => (
                       <div class="line-repi">
-                        <span class="line-avatar" aria-hidden="true">
-                          R
-                        </span>
-                        <div class="line-body">
-                          <p class="line-from">Repi</p>
-                          <p class="line-text">{note().text}</p>
-                        </div>
+                        <p class="line-note">{note().text}</p>
                       </div>
                     )}
                   </Show>
@@ -353,11 +349,15 @@ export function ChatScreen(props: ChatScreenProps) {
                   <Show when={line.kind === "assistant" ? line : null}>
                     {(assistant) => (
                       <div class="line-repi">
-                        <span class="line-avatar" aria-hidden="true">
-                          R
-                        </span>
                         <div class="line-body">
-                          <p class="line-from">Repi</p>
+                          <Show when={assistant().thinking}>
+                            {(thinking) => (
+                              <ThinkingBlock
+                                text={thinking()}
+                                streaming={assistant().state === "streaming"}
+                              />
+                            )}
+                          </Show>
                           <Show when={assistant().activity}>
                             {(activity) => <p class="line-activity">{activity()}</p>}
                           </Show>
@@ -372,12 +372,17 @@ export function ChatScreen(props: ChatScreenProps) {
                     )}
                   </Show>
 
+                  <Show when={line.kind === "tool" ? line : null}>
+                    {(tool) => (
+                      <div class="line-repi">
+                        <ToolLine line={tool()} />
+                      </div>
+                    )}
+                  </Show>
+
                   <Show when={line.kind === "file" ? line : null}>
                     {(file) => (
                       <div class="line-repi">
-                        <span class="line-avatar" aria-hidden="true">
-                          R
-                        </span>
                         <div class="line-body">
                           <article class="file-card" data-analysable={file().engine ? "true" : "false"}>
                             <p class="file-name">{file().name}</p>
