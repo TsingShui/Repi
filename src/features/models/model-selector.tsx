@@ -1,5 +1,6 @@
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { modelKey, type ModelProvider } from "./types";
+import { applyMenuPlacement, placeMenu } from "../../lib/menu-placement";
 import "./model-selector.css";
 
 export interface ModelSelectorProps {
@@ -12,6 +13,34 @@ export interface ModelSelectorProps {
 export function ModelSelector(props: ModelSelectorProps) {
   const [open, setOpen] = createSignal(false);
   let root: HTMLDivElement | undefined;
+  let trigger: HTMLButtonElement | undefined;
+  let menu: HTMLDivElement | undefined;
+  let menuScroll: HTMLDivElement | undefined;
+
+  /*
+   * The menu opens wherever there is room: this control lives in the composer at the bottom of
+   * the window, so the answer used to be a menu that opened downward into nothing.
+   */
+  createEffect(
+    () => [open(), props.providers, props.selectedKey] as const,
+    () => {
+      if (!open() || !trigger || !menu) return;
+      // The menu's height is measured from its scroll area, not from the menu: the menu is the
+      // box being capped, so asking it how much room it needs answers with the cap.
+      const apply = () =>
+        applyMenuPlacement(menu!, placeMenu(trigger!, menu!, { content: menuScroll ?? null }));
+      apply();
+      window.addEventListener("resize", apply);
+      window.addEventListener("scroll", apply, true);
+      const observer = new ResizeObserver(apply);
+      observer.observe(menuScroll ?? menu);
+      onCleanup(() => {
+        window.removeEventListener("resize", apply);
+        window.removeEventListener("scroll", apply, true);
+        observer.disconnect();
+      });
+    },
+  );
 
   const selected = () => {
     const key = props.selectedKey;
@@ -52,6 +81,7 @@ export function ModelSelector(props: ModelSelectorProps) {
         }
       >
         <button
+          ref={(node) => (trigger = node)}
           class="model-selector-trigger"
           type="button"
           aria-haspopup="listbox"
@@ -74,8 +104,13 @@ export function ModelSelector(props: ModelSelectorProps) {
         </button>
 
         <Show when={open()}>
-          <div class="model-menu" role="listbox" aria-label="Choose a model">
-            <div class="model-menu-scroll">
+          <div
+            ref={(node) => (menu = node)}
+            class="model-menu"
+            role="listbox"
+            aria-label="Choose a model"
+          >
+            <div ref={(node) => (menuScroll = node)} class="model-menu-scroll">
               <For each={props.providers}>
                 {(provider) => (
                   <Show when={provider.models.length > 0}>

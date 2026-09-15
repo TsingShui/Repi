@@ -15,7 +15,8 @@
     "check:detect": "node ./scripts/run-analysis-check.mjs detect-check",
     "check:kuna": "node ./scripts/run-analysis-check.mjs kuna-check",
     "check:device": "node ./scripts/device-check.mjs",
-    "check:device-tools": "node ./scripts/run-analysis-check.mjs device-tools-check"
+    "check:device-tools": "node ./scripts/run-analysis-check.mjs device-tools-check",
+    "check:menu": "node ./scripts/menu-check.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.85.1",
