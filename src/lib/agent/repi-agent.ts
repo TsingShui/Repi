@@ -234,10 +234,20 @@ program again, so read the answer, not a first failure. In scope:
                    rasc(['strings', '--limit', '50', '--filter', 'http', "${ARCHIVE_PATH}"])
                    rasc(['getclass', "${ARCHIVE_PATH}", 'com.example.MainActivity'])
                    extract('/lib/arm64-v8a/libfoo.so')      // { path, bytes }
-                   kuna([binaryPath, 'list'])               // functions, with addresses
+                   kuna([binaryPath, 'list'])               // every function as a JSON record
                    kuna([binaryPath, 'decompile', 'JNI_OnLoad'])
+                   kuna([binaryPath, 'decompile', '0x401000'])   // by address instead of name
+                   kuna([binaryPath, 'decompile'])               // all of them: megabytes
+                   kuna([binaryPath, 'project'])                 // a project export into /work
   extract(path)  pulls one entry out of the archive and mounts it, returning the path to use
                  afterwards — this is how a native library inside an APK reaches Kuna.
+
+Kuna has exactly three subcommands — \`list\`, \`decompile\`, \`project\` — and anything else
+comes back as a usage error rather than as data, so do not reach for \`info\` or \`functions\`.
+\`list\` is one record per function, which on a real library is hundreds of records, and
+\`decompile\` with no argument is the whole binary: count, filter and sample those in the program.
+When you want the whole thing, write() it to a file and read it back in windows — the transcript
+only needs the part that answers the question.
   tools()        what this sandbox can do: each tool, and whether it is loaded yet.
   print(value)   adds a line to what you receive. The last expression's value (or a returned
                  value) is returned to you as well.
@@ -268,6 +278,14 @@ ${outcome.error.stack.split("\n").slice(0, 3).join("\n")}` : "";
     `[${entry.format.label}: ${outcome.calls} engine call(s), ${outcome.ms} ms` +
       `${outcome.truncated ? ", output truncated" : ""}]`,
   );
+  if (outcome.truncated) {
+    // Cut is not the same as small: say what to do instead of leaving a document that stops
+    // mid-token, which reads as a bug in the engine rather than as a ceiling on the answer.
+    parts.push(
+      "[the answer was cut at the output ceiling. For all of it, write(path, text) the text from " +
+        "the program and read it back in windows; return the count and a sample here.]",
+    );
+  }
   return parts.join("\n\n");
 }
 
