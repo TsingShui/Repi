@@ -89,9 +89,17 @@ function MainApp() {
   const [effectiveThinkingLevel, setEffectiveThinkingLevel] =
     createSignal<ModelThinkingLevel>("off");
   createEffect(
-    () => [conversations.active().selectedModelKey, conversations.active().thinkingLevel] as const,
-    ([key, requested]) => {
-      const choice = key === undefined ? null : selection(models.providers(), key);
+    () =>
+      [
+        // Providers are part of the question, not a constant in it: on a refresh the conversation
+        // is restored from storage before the provider list is, and an answer computed while the
+        // list is still empty is "this model has no levels" — a fact about the load order.
+        models.providers(),
+        conversations.active().selectedModelKey,
+        conversations.active().thinkingLevel,
+      ] as const,
+    ([providers, key, requested]) => {
+      const choice = key === undefined ? null : selection(providers, key);
       if (!choice) {
         setThinkingLevels(["off"]);
         setEffectiveThinkingLevel("off");

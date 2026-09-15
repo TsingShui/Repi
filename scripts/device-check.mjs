@@ -102,6 +102,7 @@ async function openDialog(mode) {
   await page.close();
 }
 
-await browser.close();
+// The browser belongs to whoever launched it: `connectOverCDP` means this script is a guest, and
+// closing a guest's host shuts down the instance the next run needs.
 console.log(`\n${failures === 0 ? "all device checks passed" : `${failures} check(s) failed`}`);
 process.exitCode = failures === 0 ? 0 : 1;

@@ -225,6 +225,22 @@ await page.waitForTimeout(200);
   check("and it reads back as the current level", (await page.locator(".thinking-trigger").innerText()).includes("high"));
 }
 
+// A refresh is where this went wrong once: the conversation came back from storage before the
+// provider list did, the answer was computed against an empty list, and nothing asked again.
+await page.reload({ waitUntil: "load" });
+await page.waitForTimeout(800);
+check(
+  "the thinking control survives a reload",
+  (await page.locator(".thinking-trigger").count()) === 1,
+);
+check(
+  "and shows the level the conversation remembered",
+  (await page.locator(".thinking-trigger").innerText()).includes("high"),
+  (await page.locator(".thinking-trigger").count()) === 1
+    ? await page.locator(".thinking-trigger").innerText()
+    : "(no control)",
+);
+
 // Clean up the seeded provider so a real browser profile is not left holding it.
 await page.evaluate(async () => {
   const request = indexedDB.open("repi-workspace");
@@ -236,7 +252,8 @@ await page.evaluate(async () => {
   database.close();
 });
 await page.close();
-await browser.close();
+// The browser belongs to whoever launched it: `connectOverCDP` means this script is a guest, and
+// closing a guest's host shuts down the instance the next run needs.
 
 console.log(`\n${failures === 0 ? "all menu checks passed" : `${failures} check(s) failed`}`);
 process.exitCode = failures === 0 ? 0 : 1;
