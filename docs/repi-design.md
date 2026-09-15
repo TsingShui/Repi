@@ -58,8 +58,9 @@ The rail carries the product identity and the About link. Its lower-left stack a
 holds **Storage** and **Device**.
 
 **Storage** is the one row there that shows a quantity rather than a state: the amount
-the browser is holding, a bar for how much of the quota that is, and the backend and
-retention policy underneath. The bar is green while there is room, amber past three
+the browser is holding, a bar for how much of the quota that is on the label's own line
+instead of one of its own, and the backend and retention policy underneath. The bar is
+green while there is room, amber past three
 quarters, red past nine tenths, because the only thing a capacity bar has to say is
 when to stop. A store that holds something is never drawn empty: a few hundred
 kilobytes against a ten-gigabyte quota rounds to nothing, and zero would be a lie about

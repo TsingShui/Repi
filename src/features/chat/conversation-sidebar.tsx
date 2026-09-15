@@ -135,13 +135,13 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
               <ellipse cx="12" cy="5" rx="7" ry="3" />
               <path d="M5 5v10c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10c0 1.7 3.1 3 7 3s7-1.3 7-3" />
             </svg>
-            <span>Storage</span>
+            <span class="storage-meter-label">Storage</span>
+            <span class="storage-meter-track" aria-hidden="true">
+              <span class="storage-meter-fill" style={{ width: `${usagePercent(props.usage)}%` }} />
+            </span>
             <Show when={usageValue(props.usage)}>
               {(value) => <small class="storage-meter-value">{value()}</small>}
             </Show>
-          </span>
-          <span class="storage-meter-track" aria-hidden="true">
-            <span class="storage-meter-fill" style={{ width: `${usagePercent(props.usage)}%` }} />
           </span>
           <small class="storage-meter-note" title={props.storageError ?? usageNote(props.usage)}>
             {props.storageError ?? usageNote(props.usage)}

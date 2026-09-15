@@ -204,7 +204,9 @@
   flex: none;
 }
 
-.storage-meter-head > span {
+.storage-meter-label {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: var(--ink);
   font-size: 13px;
@@ -213,16 +215,23 @@
   white-space: nowrap;
 }
 
-/* The number sits with the words rather than over the bar: the bar is proportion. */
+/* The number ends the row: the bar is proportion, the number is the amount. */
 .storage-meter-value {
-  margin-left: auto;
+  flex: none;
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: 11px;
 }
 
+/*
+ * The bar rides the row the label is on instead of taking one of its own. In a rail
+ * this narrow a proportion does not need a line to itself, and beside the words it
+ * reads as one sentence with the amount that ends it.
+ */
 .storage-meter-track {
   display: block;
+  flex: 1 1 44px;
+  min-width: 28px;
   height: 5px;
   overflow: hidden;
   border-radius: var(--r-pill);
