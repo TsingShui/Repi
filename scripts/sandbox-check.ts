@@ -20,6 +20,7 @@ import { openSync, readSync, statSync, closeSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractEntry } from "../src/lib/analysis/archive/zip-extract";
+import { createVfsFunctions } from "../src/lib/agent/vfs-functions";
 import { Sandbox, type EngineOutcome } from "../src/lib/agent/quickjs-sandbox";
 
 const APK = process.env.APK;
@@ -186,6 +187,51 @@ const instrumented = new Sandbox({ functions: { rasc: counting } }, LIMITS);
     } finally {
       closeSync(fd);
     }
+  }
+}
+
+// ------------------------------------------------- the filesystem, from inside a program
+//
+// The rules themselves are checked in `text-files-check`; what is checked here is the part that
+// only a real interpreter can answer: that a program can *call* these functions at all, in the
+// sandbox the worker actually builds, with the results coming back marshalled the way a program
+// receives them.
+{
+  const written = new Map<string, Uint8Array>();
+  const shared = new Map<string, Uint8Array>([
+    ["notes/prior.md", new TextEncoder().encode("from an earlier session\nsecond line\n")],
+  ]);
+  const withFiles = new Sandbox(
+    { functions: { rasc, ...createVfsFunctions({ written, shared }) } },
+    LIMITS,
+  );
+  try {
+    const outcome = await withFiles.run(`
+      const before = read('notes/prior.md');
+      write('out/note.md', 'kept: ' + before.split('\\n')[1].trim());
+      edit('out/note.md', 'kept:', 'saved:');
+      return { before, after: read('out/note.md') };
+    `);
+    const result = outcome.result ?? "";
+    check(
+      "a program reads a file another session produced",
+      result.includes("second line"),
+      outcome.error ? `${outcome.error.name}: ${outcome.error.message}` : result.slice(0, 120),
+    );
+    check("writes one, edits it, and reads it back", result.includes("saved: second line"), result.slice(0, 160));
+    check(
+      "a program's read is the file's text, with no header mixed in",
+      result.includes('"before":"from an earlier session') ||
+        result.includes('"before":"second line'),
+      result.slice(0, 120),
+    );
+    check(
+      "and what it wrote is what the host is handed",
+      new TextDecoder().decode(written.get("out/note.md") ?? new Uint8Array()) === "saved: second line",
+      new TextDecoder().decode(written.get("out/note.md") ?? new Uint8Array()),
+    );
+  } finally {
+    withFiles.dispose();
   }
 }
 

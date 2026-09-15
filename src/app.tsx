@@ -66,6 +66,8 @@ function MainApp() {
       list: () => conversations.listVirtualFiles(),
       save: (path, bytes, conversationId) =>
         conversations.saveVirtualFile(path, bytes, conversationId),
+      stat: (path) => conversations.statVirtualFile(path),
+      read: (path) => conversations.readVirtualFile(path),
     },
     // The agent drives the same session the dialog shows; see the store's `bridge`.
     device: devices.bridge,

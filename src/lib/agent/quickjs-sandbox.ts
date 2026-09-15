@@ -170,7 +170,14 @@ export class Sandbox {
     context.setProp(context.global, "print", print);
     print.dispose();
     // `console.log` is what a model reaches for first; the same function costs nothing.
-    context.evalCode("globalThis.console = { log: print, error: print, warn: print, info: print };");
+    // The assignment's own result is a handle like any other, and it holds the object it made:
+    // an undisposed one keeps that object on the runtime's list for the runtime's whole life,
+    // which is what `JS_FreeRuntime` then aborts on.
+    const consoleSetup = context.evalCode(
+      "globalThis.console = { log: print, error: print, warn: print, info: print };",
+    );
+    if (consoleSetup.error) consoleSetup.error.dispose();
+    else consoleSetup.value.dispose();
 
     for (const [name, implementation] of Object.entries(this.#host.functions)) {
       const handle = context.newFunction(name, (...argHandles) => {
@@ -196,29 +203,41 @@ export class Sandbox {
    *
    * Arrays are arrays on the guest side too: a host that returns a list (`ls()` does) must not
    * arrive as an object with numeric keys, or `.map` and `.length` are the wrong kind of wrong.
+   *
+   * Every handle made here is disposed once its value is in the tree. `setProp` copies the
+   * reference rather than taking the handle, so a handle left alive keeps its object alive for
+   * good — and a runtime freed with objects still on its list aborts the wasm module outright
+   * (`list_empty(&rt->gc_obj_list)`), which is a crash in the middle of a disposal rather than
+   * anywhere useful. The leak was invisible for as long as nothing ever disposed a healthy
+   * sandbox: a host function returning an object leaked one per call, and the check only found
+   * it when a session was closed on purpose.
    */
   #marshal(context: QuickJSContext, value: unknown): QuickJSHandle {
+    if (value === null) return context.null;
+    if (value === undefined) return context.undefined;
+    if (value === true) return context.true;
+    if (value === false) return context.false;
+
     if (Array.isArray(value)) {
       const array = context.newArray();
       value.forEach((entry, index) => {
-        context.setProp(array, index, this.#marshal(context, entry));
+        const handle = this.#marshal(context, entry);
+        context.setProp(array, index, handle);
+        handle.dispose();
       });
       return array;
     }
-    if (value !== null && typeof value === "object") {
+    if (typeof value === "object") {
       const object = context.newObject();
       for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-        if (typeof entry === "string") context.setProp(object, key, context.newString(entry));
-        else if (typeof entry === "number") context.setProp(object, key, context.newNumber(entry));
-        else if (typeof entry === "boolean") context.setProp(object, key, context.newNumber(entry ? 1 : 0));
-        else if (entry !== null && entry !== undefined && typeof entry === "object") {
-          context.setProp(object, key, this.#marshal(context, entry));
-        } else if (entry !== null && entry !== undefined) {
-          context.setProp(object, key, context.newString(String(entry)));
-        }
+        const handle = this.#marshal(context, entry);
+        context.setProp(object, key, handle);
+        handle.dispose();
       }
       return object;
     }
+    if (typeof value === "number") return context.newNumber(value);
+    if (typeof value === "bigint") return context.newBigInt(value);
     return context.newString(String(value));
   }
 

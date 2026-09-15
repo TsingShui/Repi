@@ -42,6 +42,15 @@ export class SandboxCancelledError extends Error {
 export interface SandboxSession {
   /** Runs one program and resolves with what it printed, returned, or failed with. */
   run(code: string): Promise<SandboxOutcome>;
+  /**
+   * Adds or replaces files in the shared filesystem this session has mounted.
+   *
+   * The mount is a snapshot from load time, which is right for a program and wrong for a
+   * conversation: the agent writes a file with its own hands and then opens it in a program a
+   * moment later. Only the files that changed are sent — what the caller has, not the whole
+   * filesystem again — and reloading the session instead would refetch the engines with it.
+   */
+  refreshVfs(files: readonly { readonly path: string; readonly bytes: Uint8Array }[]): Promise<void>;
   /** Kills the Worker. The session is unusable afterwards. */
   cancel(): void;
   close(): void;
@@ -182,6 +191,13 @@ export function openSandbox(file: File, options: SandboxSessionOptions): Sandbox
       });
       post({ type: "run", id, code });
       return outcome;
+    },
+    async refreshVfs(files) {
+      // Before the first run there is nothing loaded to refresh, and the load will carry its own
+      // snapshot anyway.
+      if (closed || ready === null || files.length === 0) return;
+      await load().catch(() => undefined);
+      post({ type: "vfs", vfs: files });
     },
     cancel() {
       terminate(new SandboxCancelledError());

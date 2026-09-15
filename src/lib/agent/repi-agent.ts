@@ -19,6 +19,7 @@ import type { Usage } from "@earendil-works/pi-ai";
 import type { SandboxOutcome } from "./quickjs-sandbox";
 import { customModel, resolveThinkingLevel } from "../../features/models/model-facts";
 import { deviceParagraph, deviceTools } from "./device-tools";
+import { fileTools } from "./file-tools";
 import type { DeviceBridge } from "./device-bridge";
 
 const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a browser.
@@ -26,6 +27,12 @@ const SYSTEM_PROMPT = `You are Repi, a reverse-engineering agent running in a br
 You inspect the user's attached binary by writing short JavaScript programs with run_js. The
 program runs on the user's device, beside the analyser, and only what it prints or returns
 comes back to you — the binary never leaves the machine and never enters this conversation.
+
+You have a filesystem, and it keeps things. \`write\` stores text under a path — a script you
+are about to run twice, a listing you computed, a note worth keeping — and \`read\` opens one
+line by line, \`edit\` changes one exact string. Files live where the user's storage panel and
+their \`@\` menu look, so what you save is something they can see and hand back to you later, and
+what they save is something you can open.
 
 Write a program when you want to know something. The analyser's own output is large (a class
 list from a real APK is around 20 MB, and a string table is bigger), so filter with the
@@ -85,6 +92,14 @@ export interface RepiAgentRuntimeOptions {
   readonly vfs: {
     list(): Promise<readonly { readonly path: string; readonly bytes: Uint8Array }[]>;
     save(path: string, bytes: Uint8Array, conversationId: string): Promise<void>;
+    /**
+     * One file, by metadata and by bytes.
+     *
+     * `list` loads everything, which is what the sandbox mount needs and what a tool must never
+     * do: reading one file should cost that file, not the whole filesystem beside it.
+     */
+    stat(path: string): Promise<number | null>;
+    read(path: string): Promise<Uint8Array | null>;
   };
   /**
    * The Android device, when one is attached. Absent in a build without WebUSB.
@@ -212,6 +227,26 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
    * function call rather than a protocol: the program names the mount, and the bytes are
    * already there.
    */
+  /** Files written on every loaded session's behalf, so their mounts can be refreshed. */
+  const pendingSaves: Promise<unknown>[] = [];
+
+  /**
+   * Hands files to every session that has the filesystem mounted.
+   *
+   * A session's mount is a snapshot, and the page can write files behind its back — with a tool,
+   * or through another session. The writer's own copy is already in its map (a program's writes
+   * land there as they happen), and sending it again costs one message and keeps this honest
+   * about who needs to know: everyone the file changed for, which is everyone.
+   */
+  const pushFiles = (files: readonly { readonly path: string; readonly bytes: Uint8Array }[]) => {
+    if (files.length === 0) return;
+    for (const entry of loaded.values()) {
+      void entry
+        .then((session) => session.sandbox.refreshVfs(files))
+        .catch(() => undefined);
+    }
+  };
+
   const load = (conversation: Conversation, fileId: string): Promise<Loaded> => {
     const known = loaded.get(fileId);
     if (known) return known;
@@ -249,8 +284,13 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
           // the sandbox having a filesystem rather than a scratch copy of one.
           onProduced: (files) => {
             for (const produced of files) {
-              void options.vfs.save(produced.path, produced.bytes, conversation.id).catch(() => undefined);
+              pendingSaves.push(
+                options.vfs.save(produced.path, produced.bytes, conversation.id).catch(() => undefined),
+              );
             }
+            // The same path can be read from another attached binary's sandbox, so the file
+            // goes to every open mount rather than only the one that produced it.
+            pushFiles(files);
           },
           engines: installed,
           ...(warm ? { warm } : {}),
@@ -270,6 +310,21 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
 
   const toolsFor = (conversation: Conversation): AgentTool[] => [
     ...deviceTools(options, conversation.id),
+    ...fileTools(
+      {
+        files: {
+          stat: (path) => options.vfs.stat(path),
+          read: (path) => options.vfs.read(path),
+          write: async (path, bytes, id) => {
+            await options.vfs.save(path, bytes, id);
+            // Written where the panel and other conversations can see it, and mounted where a
+            // program can open it.
+            pushFiles([{ path, bytes }]);
+          },
+        },
+      },
+      conversation.id,
+    ),
     {
       name: "list_binaries",
       label: "List binaries",
@@ -306,6 +361,8 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
         const entry = await load(conversation, params.fileId);
         if (signal?.aborted) throw new Error("Stopped.");
         const outcome = await entry.sandbox.run(params.code);
+        // The program's output becomes files; until they are stored, nothing else can read them.
+        await Promise.all(pendingSaves.splice(0));
         return {
           content: [{ type: "text", text: toolText(renderOutcome(entry, outcome)) }],
           details: outcome,

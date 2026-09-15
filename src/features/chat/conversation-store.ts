@@ -413,6 +413,18 @@ export function createConversationStore() {
       );
       return loaded;
     },
+    /** One shared file's size, without opening it. */
+    statVirtualFile: async (path: string): Promise<number | null> => {
+      const record = (await storage.listDerived()).find((entry) => entry.path === path);
+      return record?.size ?? null;
+    },
+    /** One shared file's bytes — the file asked for, not every file there is. */
+    readVirtualFile: async (path: string): Promise<Uint8Array | null> => {
+      const record = (await storage.listDerived()).find((entry) => entry.path === path);
+      if (!record) return null;
+      const file = await storage.openFile(record.id);
+      return new Uint8Array(await file.arrayBuffer());
+    },
     /**
      * What is in the shared filesystem, by metadata only.
      *

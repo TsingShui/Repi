@@ -26,6 +26,8 @@
  * wants to stop, ends with `Worker.terminate()`.
  */
 import { extractEntry, type ReadAt } from "../analysis/archive/zip-extract";
+import { normalizeVfsPath } from "./text-files";
+import { createVfsFunctions } from "./vfs-functions";
 import { createKunaHost, kunaMounts, type KunaHost } from "../analysis/kuna/kuna-host";
 import { DEFAULT_MAX_INFLATED_ENTRY } from "../analysis/rasc/limits";
 import { ARCHIVE_PATH, MOUNT, runCommandSync } from "../analysis/rasc/wasi";
@@ -74,7 +76,24 @@ export interface SandboxRunRequest {
   readonly code: string;
 }
 
-export type SandboxRequest = SandboxLoadRequest | SandboxRunRequest;
+/**
+ * Adds or replaces files in the shared filesystem a running session has mounted.
+ *
+ * The mount is a snapshot taken when the session loaded, which is right for a program and wrong
+ * for a conversation: the agent can write a file with its own hands and then open it in a program
+ * a moment later. Reloading the session instead would throw away the compiled engine with it —
+ * tens of megabytes fetched again to pick up one file — so the mount is amended in place.
+ *
+ * Merging rather than replacing is what makes that cheap: a caller sends the files that changed,
+ * not the whole filesystem again. Nothing is ever deleted from it, so a path that stops being
+ * mentioned is a path that still exists.
+ */
+export interface SandboxVfsRequest {
+  readonly type: "vfs";
+  readonly vfs: readonly { readonly path: string; readonly bytes: Uint8Array }[];
+}
+
+export type SandboxRequest = SandboxLoadRequest | SandboxRunRequest | SandboxVfsRequest;
 
 export type SandboxState = "ready" | "loadable" | "unavailable";
 
@@ -175,6 +194,9 @@ function hostFor(state: Loaded) {
     functions: {
       rasc: engine("rasc"),
       kuna: engine("kuna"),
+      // The same files the engines are mounted on, reachable from the program rather than only
+      // from the wasm side: what a program computes can now outlive the run.
+      ...createVfsFunctions({ written: state.written, shared: state.shared }),
 
       /**
        * What is in the sandbox: the shared files, the attachment, and each one's size.
@@ -258,6 +280,17 @@ async function provision(state: Loaded, name: SandboxEngine): Promise<boolean> {
 self.onmessage = async (event: MessageEvent<SandboxRequest>) => {
   const request = event.data;
   try {
+    if (request.type === "vfs") {
+      if (loaded) {
+        // `written` stays untouched: it is this session's own work, and the refresh brings in
+        // what the conversation wrote around it.
+        for (const file of request.vfs) {
+          loaded.shared.set(normalizeVfsPath(file.path), file.bytes);
+        }
+      }
+      return;
+    }
+
     if (request.type === "load") {
       const state: Loaded = {
         file: request.file,
@@ -268,7 +301,11 @@ self.onmessage = async (event: MessageEvent<SandboxRequest>) => {
         smallBundleUrl: request.smallBundleUrl ?? null,
         ready: new Map(),
         wanted: new Set(),
-        shared: new Map((request.vfs ?? []).map((entry) => [entry.path.split("/").pop() ?? entry.path, entry.bytes])),
+        // The path the storage knows, which is also the path `extract()` writes and the one the
+        // `@` menu shows. Flattening these to their basenames once made the same file have two
+        // names depending on when it was mounted — `/work/libfoo.so` after a reload and
+        // `/work/lib/arm64-v8a/libfoo.so` in the session that produced it.
+        shared: new Map((request.vfs ?? []).map((entry) => [normalizeVfsPath(entry.path), entry.bytes])),
         written: new Map(),
       };
       loaded = state;
