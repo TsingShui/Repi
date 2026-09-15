@@ -5,6 +5,15 @@ export type ModelProvider = {
   readonly name: string;
   readonly baseUrl: string;
   readonly models: readonly string[];
+  /**
+   * The models on this provider that accept a reasoning effort, by id.
+   *
+   * Only a custom provider needs this: a built-in one carries pi's own catalog, which knows
+   * each model's capabilities. An arbitrary OpenAI-compatible endpoint does not have to say
+   * anything about a model, and a wrong guess here is paid for on every request — a
+   * `reasoning_effort` an endpoint does not understand is an error, not a hint it ignores.
+   */
+  readonly reasoningModels?: readonly string[];
   readonly createdAt: number;
 } & (
   | {

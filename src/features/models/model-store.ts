@@ -50,11 +50,23 @@ export function createModelStore() {
     return updated;
   };
 
-  const updateModels = async (id: string, models: readonly string[]): Promise<ModelProvider> => {
+  const updateModels = async (
+    id: string,
+    models: readonly string[],
+    reasoningModels: readonly string[] = [],
+  ): Promise<ModelProvider> => {
     await initialization;
     const existing = providers().find((provider) => provider.id === id);
     if (!existing) throw new Error("The provider is no longer available.");
-    const updated: ModelProvider = { ...existing, models: [...models] };
+    const { reasoningModels: _, ...withoutReasoning } = existing;
+    void _;
+    // Refreshed from the catalog, not merged: a model that stopped advertising reasoning is a
+    // model whose reasoning_effort should stop being sent.
+    const updated: ModelProvider = {
+      ...withoutReasoning,
+      models: [...models],
+      ...(reasoningModels.length > 0 ? { reasoningModels: [...reasoningModels] } : {}),
+    };
     await storage.putProvider(updated);
     setProviders((current) => current.map((provider) => (provider.id === id ? updated : provider)));
     setError(null);

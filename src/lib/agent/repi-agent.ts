@@ -16,6 +16,7 @@ import { ENGINE_WASM } from "./sandbox";
 import { detectFormat, type FormatMatch } from "../detect-format";
 import { openSandbox, type SandboxSession } from "./sandbox";
 import type { SandboxOutcome } from "./quickjs-sandbox";
+import { customModel, resolveThinkingLevel } from "../../features/models/thinking";
 import { deviceParagraph, deviceTools } from "./device-tools";
 import type { DeviceBridge } from "./device-bridge";
 
@@ -314,18 +315,9 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
     ) => ReturnType<typeof streamSimple>;
 
     if (choice.provider.kind === "custom") {
-      model = {
-        id: choice.modelId,
-        name: choice.modelId,
-        api: "openai-completions",
-        provider: choice.provider.id,
-        baseUrl: choice.provider.baseUrl,
-        reasoning: false,
-        input: ["text"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 128_000,
-        maxTokens: 16_384,
-      };
+      // The same model object the thinking menu was built from: one definition, so the levels
+      // offered and the levels sent cannot drift apart.
+      model = customModel(choice.provider, choice.modelId);
       apiKey = choice.provider.apiKey || "repi-local";
       providerStream = (activeModel, context, streamOptions) =>
         streamSimple(activeModel as Model<"openai-completions">, context, streamOptions);
@@ -341,6 +333,11 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
         piProvider.streamSimple(activeModel, context, streamOptions);
     }
 
+    // What the conversation asked for, folded into what this model accepts: a model that cannot
+    // think runs at "off" instead of failing, and one that names its levels differently gets
+    // its own name for the one that was asked for.
+    const thinkingLevel = resolveThinkingLevel(model, conversation.thinkingLevel);
+
     let completedText = "";
     let currentText = "";
     let finalError: string | null = null;
@@ -350,7 +347,7 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
       initialState: {
         systemPrompt: SYSTEM_PROMPT + deviceParagraph(options.device?.describe() ?? null),
         model,
-        thinkingLevel: "off",
+        thinkingLevel,
         tools: toolsFor(conversation),
         messages: seedMessages(conversation),
       },
@@ -375,6 +372,11 @@ export function createRepiAgentRuntime(options: RepiAgentRuntimeOptions) {
       } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         currentText += event.assistantMessageEvent.delta;
         callbacks.onText(visibleText());
+        callbacks.onActivity(undefined);
+      } else if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_start") {
+        // Thinking is invisible in the transcript, so the one thing the user needs to know is
+        // that the wait is work rather than a stall.
+        callbacks.onActivity("Thinking…");
       } else if (event.type === "tool_execution_start") {
         callbacks.onActivity(`Using ${event.toolName.replaceAll("_", " ")}…`);
       } else if (event.type === "tool_execution_end") {

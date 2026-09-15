@@ -1,4 +1,5 @@
-import { createSignal, lazy, Match, onCleanup, Show, Switch } from "solid-js";
+import { createEffect, createSignal, lazy, Match, onCleanup, Show, Switch } from "solid-js";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createFinePointer } from "./lib/pointer";
 import { detectFormat } from "./lib/detect-format";
 import { createRepiAgentRuntime } from "./lib/agent/repi-agent";
@@ -10,8 +11,9 @@ import { DeviceDialog } from "./features/devices/device-dialog";
 import { createDeviceStore } from "./features/devices/device-store";
 import { ProviderDialog } from "./features/models/provider-dialog";
 import { createModelStore } from "./features/models/model-store";
+import { thinkingOptions } from "./features/models/thinking";
 import { StorageDialog } from "./features/storage/storage-dialog";
-import { modelKey } from "./features/models/types";
+import { modelKey, type ModelProvider } from "./features/models/types";
 import "./app.css";
 
 /**
@@ -66,6 +68,48 @@ function MainApp() {
     device: devices.bridge,
   });
   const finePointer = createFinePointer();
+
+  /** `provider-id:model-id` resolved against the configured providers. */
+  const selection = (providers: readonly ModelProvider[], key: string) => {
+    for (const provider of providers) {
+      const model = provider.models.find((candidate) => modelKey(provider.id, candidate) === key);
+      if (model) return { provider, model };
+    }
+    return null;
+  };
+
+  /**
+   * The thinking levels the selected model accepts.
+   *
+   * Asked per selection rather than computed from the provider list, because answering it means
+   * reading pi's catalog for a built-in provider — and the answer belongs to the *model*, not to
+   * the app: what is offered here is exactly what will be accepted on the wire.
+   */
+  const [thinkingLevels, setThinkingLevels] = createSignal<readonly ModelThinkingLevel[]>(["off"]);
+  const [effectiveThinkingLevel, setEffectiveThinkingLevel] =
+    createSignal<ModelThinkingLevel>("off");
+  createEffect(
+    () => [conversations.active().selectedModelKey, conversations.active().thinkingLevel] as const,
+    ([key, requested]) => {
+      const choice = key === undefined ? null : selection(models.providers(), key);
+      if (!choice) {
+        setThinkingLevels(["off"]);
+        setEffectiveThinkingLevel("off");
+        return;
+      }
+      let current = true;
+      void thinkingOptions(choice.provider, choice.model, requested).then((options) => {
+        if (!current) return;
+        setThinkingLevels(options.levels);
+        // Shown, not stored: the conversation keeps the level it asked for, so switching to a
+        // model that lacks it and back again does not quietly rewrite the choice.
+        setEffectiveThinkingLevel(options.effective);
+      });
+      onCleanup(() => {
+        current = false;
+      });
+    },
+  );
 
   const onHashChange = () => {
     setPage(route());
@@ -303,6 +347,9 @@ function MainApp() {
               providers={models.providers()}
               selectedModelKey={conversations.active().selectedModelKey ?? null}
               onSelectModel={conversations.selectModel}
+              thinkingLevels={thinkingLevels()}
+              thinkingLevel={effectiveThinkingLevel()}
+              onSelectThinkingLevel={conversations.selectThinkingLevel}
               onAddProvider={() => setProviderDialogOpen(true)}
               onOpenSidebar={() => setSidebarOpen(true)}
             />
@@ -344,8 +391,8 @@ function MainApp() {
           await conversations.whenReady();
           conversations.selectModel(modelKey(added.id, added.models[0]!));
         }}
-        onRefresh={async (id, availableModels) => {
-          const updated = await models.updateModels(id, availableModels);
+        onRefresh={async (id, availableModels, reasoningModels) => {
+          const updated = await models.updateModels(id, availableModels, reasoningModels);
           const selected = conversations.active().selectedModelKey;
           if (!selected || !availableModels.some((model) => modelKey(id, model) === selected)) {
             conversations.selectModel(modelKey(updated.id, updated.models[0]!));

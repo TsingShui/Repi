@@ -18,6 +18,55 @@ function modelId(value: unknown): string | null {
   return typeof candidate === "string" ? candidate.trim() || null : null;
 }
 
+/**
+ * Whether a catalog entry says its model can think.
+ *
+ * Nothing requires an OpenAI-compatible endpoint to describe its models, and most say nothing at
+ * all — in which case this is false and the model is treated as one that answers directly. Where
+ * a catalog *does* describe reasoning (OpenRouter and gateways that copy it carry
+ * `supported_parameters`, some carry a plain flag), reading it is better than asking the user to
+ * retype what the endpoint already told us. Only the fields listed here are read: a wrong guess
+ * would be sent as a `reasoning_effort` the endpoint never agreed to accept.
+ */
+function advertisesReasoning(entry: unknown): boolean {
+  if (!entry || typeof entry !== "object") return false;
+  const record = entry as Record<string, unknown>;
+
+  const parameters = record.supported_parameters ?? record.supportedParameters;
+  if (Array.isArray(parameters)) {
+    if (parameters.some((value) => value === "reasoning" || value === "include_reasoning")) {
+      return true;
+    }
+  }
+
+  if (record.reasoning === true) return true;
+
+  const capabilities = record.capabilities;
+  if (capabilities && typeof capabilities === "object") {
+    const reasoning = (capabilities as Record<string, unknown>).reasoning;
+    if (reasoning === true) return true;
+    if (reasoning && typeof reasoning === "object") {
+      if ((reasoning as Record<string, unknown>).supported === true) return true;
+    }
+  }
+
+  for (const key of ["features", "tags"]) {
+    const list = record[key];
+    if (Array.isArray(list) && list.some((value) => value === "reasoning" || value === "thinking")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** One model as the catalog described it. */
+export interface DiscoveredModel {
+  readonly id: string;
+  /** The catalog claimed the model accepts a reasoning effort. */
+  readonly reasoning: boolean;
+}
+
 function catalogEntries(payload: unknown): readonly unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
@@ -53,7 +102,7 @@ export async function discoverOpenAIModels(
   baseUrl: string,
   apiKey: string,
   signal?: AbortSignal,
-): Promise<readonly string[]> {
+): Promise<readonly DiscoveredModel[]> {
   let endpoint: string;
   try {
     endpoint = catalogUrl(baseUrl.trim());
@@ -102,16 +151,18 @@ export async function discoverOpenAIModels(
     throw new Error("The provider returned a model catalog that is not valid JSON.");
   }
 
-  const models = [
-    ...new Set(
-      catalogEntries(payload)
-        .slice(0, MAX_MODELS)
-        .map(modelId)
-        .filter((id): id is string => id !== null),
-    ),
-  ];
-  if (models.length === 0) {
+  // One entry per id, and a claim of reasoning anywhere among an id's duplicates counts: the
+  // same model listed twice with the flag on one of them is a model that can think.
+  const models = new Map<string, DiscoveredModel>();
+  for (const entry of catalogEntries(payload).slice(0, MAX_MODELS)) {
+    const id = modelId(entry);
+    if (id === null) continue;
+    const reasoning = advertisesReasoning(entry);
+    const known = models.get(id);
+    models.set(id, { id, reasoning: reasoning || known?.reasoning === true });
+  }
+  if (models.size === 0) {
     throw new Error("The provider returned no model IDs. You can enter them manually instead.");
   }
-  return models;
+  return [...models.values()];
 }

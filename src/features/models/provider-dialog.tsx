@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { discoverOpenAIModels } from "../../lib/agent/discover-models";
+import { discoverOpenAIModels, type DiscoveredModel } from "../../lib/agent/discover-models";
 import {
   PI_API_KEY_PROVIDERS,
   piApiKeySetup,
@@ -15,7 +15,11 @@ export interface ProviderDialogProps {
   readonly providers: readonly ModelProvider[];
   readonly onClose: () => void;
   readonly onSave: (provider: NewModelProvider) => Promise<void>;
-  readonly onRefresh: (id: string, models: readonly string[]) => Promise<void>;
+  readonly onRefresh: (
+    id: string,
+    models: readonly string[],
+    reasoningModels: readonly string[],
+  ) => Promise<void>;
   readonly onDelete: (id: string) => Promise<void>;
 }
 
@@ -26,7 +30,7 @@ export function ProviderDialog(props: ProviderDialogProps) {
   const [baseUrl, setBaseUrl] = createSignal("http://127.0.0.1:11434/v1");
   const [apiKey, setApiKey] = createSignal("");
   const [models, setModels] = createSignal("");
-  const [discovered, setDiscovered] = createSignal<readonly string[]>([]);
+  const [discovered, setDiscovered] = createSignal<readonly DiscoveredModel[]>([]);
   const [manual, setManual] = createSignal(false);
   const [discovering, setDiscovering] = createSignal(false);
   const [refreshingId, setRefreshingId] = createSignal<string | null>(null);
@@ -80,7 +84,7 @@ export function ProviderDialog(props: ProviderDialogProps) {
   const manualModelIds = () =>
     [...new Set(models().split(/[\n,]/).map((model) => model.trim()).filter(Boolean))];
 
-  const discover = async (): Promise<readonly string[]> => {
+  const discover = async (): Promise<readonly DiscoveredModel[]> => {
     if (!baseUrl().trim()) {
       setError("Add a Base URL before discovering models.");
       return [];
@@ -145,23 +149,30 @@ export function ProviderDialog(props: ProviderDialogProps) {
   };
 
   const submitCustom = async () => {
-    let modelIds = discovered().length > 0 ? discovered() : manualModelIds();
+    let entries: readonly DiscoveredModel[] =
+      discovered().length > 0
+        ? discovered()
+        : manualModelIds().map((id) => ({ id, reasoning: false }));
     if (!name().trim() || !baseUrl().trim()) {
       setError("Add a provider name and Base URL.");
       return;
     }
-    if (modelIds.length === 0 && !manual()) modelIds = await discover();
-    if (modelIds.length === 0) {
+    if (entries.length === 0 && !manual()) entries = [...(await discover())];
+    if (entries.length === 0) {
       setManual(true);
       setError((current) => current ?? "Discover models or enter at least one model ID manually.");
       return;
     }
+    const reasoningModels = entries.filter((model) => model.reasoning).map((model) => model.id);
     await save({
       kind: "custom",
       name: name().trim(),
       baseUrl: baseUrl().trim().replace(/\/$/, ""),
       apiKey: apiKey().trim(),
-      models: modelIds,
+      models: entries.map((model) => model.id),
+      // What the endpoint itself claimed. Absent means nothing was claimed, which is the
+      // honest answer for an endpoint that does not describe its models.
+      ...(reasoningModels.length > 0 ? { reasoningModels } : {}),
     });
   };
 
@@ -171,7 +182,11 @@ export function ProviderDialog(props: ProviderDialogProps) {
     setError(null);
     try {
       const found = await discoverOpenAIModels(provider.baseUrl, provider.apiKey);
-      await props.onRefresh(provider.id, found);
+      await props.onRefresh(
+        provider.id,
+        found.map((model) => model.id),
+        found.filter((model) => model.reasoning).map((model) => model.id),
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Models could not be refreshed.");
     } finally {
@@ -318,7 +333,9 @@ export function ProviderDialog(props: ProviderDialogProps) {
               <div class="discovered-models" role="status">
                 <p>{discovered().length} models found</p>
                 <div>
-                  <For each={discovered().slice(0, 8)}>{(model) => <span>{model}</span>}</For>
+                  <For each={discovered().slice(0, 8)}>
+                    {(model) => <span data-reasoning={model.reasoning ? "true" : "false"}>{model.id}</span>}
+                  </For>
                   <Show when={discovered().length > 8}><span>+{discovered().length - 8} more</span></Show>
                 </div>
               </div>

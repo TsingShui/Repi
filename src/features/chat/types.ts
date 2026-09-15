@@ -1,4 +1,4 @@
-import type { Message } from "@earendil-works/pi-ai";
+import type { Message, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { EngineId } from "../../lib/detect-format";
 
 /** One thing in a transcript, in the order it happened. */
@@ -33,6 +33,14 @@ export interface Conversation extends ConversationSummary {
   readonly lines: readonly ChatLine[];
   /** `provider-id:model-id`; each conversation remembers its own selection. */
   readonly selectedModelKey?: string;
+  /**
+   * How much the model may think before answering, when it can think at all.
+   *
+   * Kept beside the model because the two are one decision: levels are model-specific, and the
+   * same "high" means nothing on a model that does not reason. Absent means "off" — the level
+   * this app has always run at, so upgrading does not silently start spending tokens.
+   */
+  readonly thinkingLevel?: ModelThinkingLevel;
   /** Pi's provider/tool transcript, persisted separately from presentation lines. */
   readonly agentMessages?: readonly Message[];
 }

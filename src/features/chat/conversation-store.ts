@@ -1,5 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
-import type { Message } from "@earendil-works/pi-ai";
+import type { Message, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createWorkspaceStorage, type StorageUsage, type StoredFile } from "../../lib/storage/workspace-storage";
 import type { ChatLine, Conversation } from "./types";
 
@@ -10,12 +10,13 @@ function makeId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function makeConversation(): Conversation {
+function makeConversation(fields: Partial<Conversation> = {}): Conversation {
   return {
     id: makeId(),
     title: UNTITLED,
     updatedAt: Date.now(),
     lines: [],
+    ...fields,
   };
 }
 
@@ -191,7 +192,15 @@ export function createConversationStore() {
   const start = () => {
     const previousId = activeId();
     const previous = conversations().find((item) => item.id === previousId);
-    const conversation = makeConversation();
+    /*
+     * A new conversation starts where the last one left off: same model, same thinking level.
+     * Both are decisions about the work rather than about this conversation, and re-deciding
+     * them on every "+" is how a setting ends up living in the user's memory instead of here.
+     */
+    const conversation = makeConversation({
+      ...(previous?.selectedModelKey ? { selectedModelKey: previous.selectedModelKey } : {}),
+      ...(previous?.thinkingLevel ? { thinkingLevel: previous.thinkingLevel } : {}),
+    });
     setConversations((all) => [
       conversation,
       ...all.filter(
@@ -214,6 +223,30 @@ export function createConversationStore() {
     if (!conversations().some((conversation) => conversation.id === id)) return;
     setActiveIdSignal(id);
     rememberActiveId(id);
+  };
+
+  /**
+   * How much the model may think in this conversation.
+   *
+   * Kept per conversation because the two go together: a quick question and a deep dive on the
+   * same model want different answers, and the model cannot know which one this is.
+   */
+  const selectThinkingLevel = (level: ModelThinkingLevel | undefined) => {
+    let updated: Conversation | undefined;
+    setConversations((current) =>
+      current.map((conversation) => {
+        if (conversation.id !== activeId()) return conversation;
+        if (level === undefined) {
+          const { thinkingLevel: _, ...rest } = conversation;
+          void _;
+          updated = rest;
+          return updated;
+        }
+        updated = { ...conversation, thinkingLevel: level };
+        return updated;
+      }),
+    );
+    if (updated) persistConversation(updated);
   };
 
   const selectModel = (key: string) => {
@@ -353,6 +386,7 @@ export function createConversationStore() {
     start,
     select,
     selectModel,
+    selectThinkingLevel,
     clearProviderSelection,
     remove,
     saveFile,

@@ -3,7 +3,9 @@ import { Markdown } from "../../components/markdown";
 import { formatBytes, type EngineId } from "../../lib/detect-format";
 import { StructureField } from "../about/structure-field";
 import { ModelSelector } from "../models/model-selector";
+import { ThinkingSelector } from "../models/thinking-selector";
 import type { ModelProvider } from "../models/types";
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ChatLine } from "./types";
 import "./chat-screen.css";
 
@@ -19,6 +21,10 @@ export interface ChatScreenProps {
   readonly fileWrite: { readonly name: string; readonly progress: number } | null;
   readonly providers: readonly ModelProvider[];
   readonly selectedModelKey: string | null;
+  /** Levels the selected model accepts; one level (or none) hides the control. */
+  readonly thinkingLevels: readonly ModelThinkingLevel[];
+  readonly thinkingLevel: ModelThinkingLevel;
+  readonly onSelectThinkingLevel: (level: ModelThinkingLevel) => void;
   readonly onSelectModel: (key: string) => void;
   readonly onAddProvider: () => void;
   readonly onOpenSidebar: () => void;
@@ -376,6 +382,11 @@ export function ChatScreen(props: ChatScreenProps) {
                     selectedKey={props.selectedModelKey}
                     onSelect={props.onSelectModel}
                     onAddProvider={props.onAddProvider}
+                  />
+                  <ThinkingSelector
+                    levels={props.thinkingLevels}
+                    value={props.thinkingLevel}
+                    onSelect={props.onSelectThinkingLevel}
                   />
                 </div>
 

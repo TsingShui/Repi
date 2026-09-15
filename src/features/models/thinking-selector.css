@@ -1,0 +1,111 @@
+/*
+ * The thinking control: a chip in the composer, a menu above it.
+ *
+ * It borrows the model picker's shape on purpose — same trigger height, same pill, same menu
+ * panel — because they are two halves of one decision and should not look like two features.
+ * The one thing of its own is the level stripe under the label: a level is a setting people
+ * change and forget, so it is worth being readable without opening the menu.
+ */
+.thinking-selector {
+  position: relative;
+  min-width: 0;
+}
+
+.thinking-trigger {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  padding: 3px 10px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.thinking-trigger:hover,
+.thinking-trigger[aria-expanded="true"] {
+  background: rgb(0 0 0 / 6%);
+  color: var(--ink);
+}
+
+.thinking-trigger svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+/* Off is a real setting, and reading as "disabled" would be wrong: it is the quiet one. */
+.thinking-trigger[data-level="off"] span {
+  opacity: 0.65;
+}
+
+.thinking-trigger[data-level="medium"],
+.thinking-trigger[data-level="high"],
+.thinking-trigger[data-level="xhigh"],
+.thinking-trigger[data-level="max"] {
+  color: var(--ink);
+}
+
+.thinking-menu {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 0;
+  width: min(220px, calc(100vw - 48px));
+  max-height: var(--menu-max, min(320px, 46vh));
+  overflow-y: auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  padding: 6px;
+  box-shadow: var(--panel-lift);
+}
+
+.thinking-menu[data-placement="up"] {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.thinking-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: var(--r-sm, 8px);
+  background: transparent;
+  padding: 8px 10px;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.thinking-option:hover {
+  background: rgb(0 0 0 / 5%);
+}
+
+.thinking-option svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.thinking-hint {
+  margin: 4px 10px 6px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
