@@ -132,7 +132,7 @@ jobs:
       # passes, what is about to be deployed can decompile.
       - name: Prove Kuna decompiles
         run: |
-          node scripts/kuna-oracle.mjs list sample.elf > /tmp/kuna-list.json
+          node scripts/kuna-oracle.mjs functions sample.elf --json > /tmp/kuna-list.json
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const { count } = JSON.parse(readFileSync("/tmp/kuna-list.json", "utf8"));
