@@ -153,9 +153,9 @@ jobs:
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const { text } = JSON.parse(readFileSync("/tmp/rasc-classes.json", "utf8"));
-            const classes = text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
-            if (classes.length === 0) {
-              console.error("::error::the engine listed no classes");
+            const classes = text.split("\n").filter(Boolean);
+            if (classes.length === 0 || !classes.every((line) => line.includes(" | L") && line.includes("; | "))) {
+              console.error("::error::the engine produced no recognizable class-index rows");
               process.exit(1);
             }
             console.log(`the engine lists ${classes.length} classes`);
