@@ -14,7 +14,7 @@
  * Usage (writes the files out for a manual session):
  *   node scripts/rasc-fixtures.mjs /tmp/repi-fixtures
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 function writeU32(data, offset, value) {
@@ -377,6 +377,9 @@ export function apkWithLeadingEntry(dex) {
 
 if (process.argv[1] !== undefined && import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href) {
   const destination = resolve(process.argv[2] ?? ".");
+  // The CLI owns the directory it writes fixtures into. CI names a fresh /tmp path,
+  // while a local developer may point it at an existing folder; both are valid.
+  mkdirSync(destination, { recursive: true });
   const classes = constStringDex({ classCount: 4 });
   const calls = callsDex();
   writeFileSync(join(destination, "classes.dex"), classes);
