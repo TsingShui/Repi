@@ -140,17 +140,20 @@ is reachable from the conversation's bar and needs no engine installed.
 Both engines are separate repositories, so their artifacts come from checkouts:
 
 ```bash
-npm run build:kuna                              # reads ~/kuna
+npm run build:kuna                              # reads ~/zhome/kuna
 KUNA_REPO=/path/to/kuna npm run build:kuna      # or say where it is
 
 npm run build:rasc                              # reads ~/rasc
 RASC_REPO=/path/to/rasc npm run build:rasc      # or say where it is
 ```
 
-`build:kuna` builds the wasm, copies the SLEIGH runtime tree and the preload
-bundle into a gitignored `public/kuna/` (about 25 MB), and refreshes the committed
-harness in `src/vendor/kuna/`. Without it the application still builds and still
-runs; a native binary simply has no analyser to hand it to.
+`build:kuna` builds the native Kuna CLI as wasm, copies the SLEIGH runtime tree and
+the preload bundle into a gitignored `public/kuna/` (about 25 MB), and refreshes the
+committed harness in `src/vendor/kuna/`. The Agent reaches its read-only analysis
+commands through `run_js` as native CLI argv — for example `kuna(['strings', path,
+'--json'])` — while the browser host supplies the SLEIGH path and rejects writing
+commands such as `decompile-project`. Without the build the application still builds
+and still runs; a native binary simply has no analyser to hand it to.
 
 `build:rasc` builds the wasm and refreshes both the served module and the vendored
 host glue. Its 1.7 MB output goes to a gitignored `public/rasc/`, the same

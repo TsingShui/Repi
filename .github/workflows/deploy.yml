@@ -102,9 +102,9 @@ jobs:
       - name: Check the engines are actually in the build
         run: |
           set -eu
-          size=$(wc -c < public/kuna/kuna_wasm.wasm)
+          size=$(wc -c < public/kuna/kuna.wasm)
           if [ "$size" -lt 1000000 ]; then
-            echo "::error::kuna_wasm.wasm is $size bytes — the engine did not build"
+            echo "::error::kuna.wasm is $size bytes — the engine did not build"
             exit 1
           fi
           specs=$(find public/kuna/specs -name '*.sla' | wc -l)

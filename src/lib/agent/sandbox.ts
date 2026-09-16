@@ -22,7 +22,7 @@ import type { SandboxEngine, SandboxRequest, SandboxResponse } from "./sandbox-w
  */
 export const ENGINE_WASM: Record<SandboxEngine, string> = {
   rasc: artifactUrl("rasc", "rasc.wasm"),
-  kuna: artifactUrl("kuna", "kuna_wasm.wasm"),
+  kuna: artifactUrl("kuna", "kuna.wasm"),
 };
 
 export class SandboxUnavailableError extends Error {

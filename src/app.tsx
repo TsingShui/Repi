@@ -321,36 +321,58 @@ function MainApp() {
         { kind: "assistant", id: lineId, text: "", state: "streaming" },
       ];
       conversations.appendTo(conversation.id, added);
+      let activeAssistantId = lineId;
+      let assistantStarted = false;
       const result = await agentRuntime.run(conversation, models.providers(), text, {
+        onAssistantStart: () => {
+          // The first response owns the placeholder created with the user's line. Every later
+          // response gets its own line, so a run_js row visibly separates model output blocks.
+          if (!assistantStarted) {
+            assistantStarted = true;
+            return;
+          }
+          const nextId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+          activeAssistantId = nextId;
+          runIds = { conversationId: conversation.id, lineId: nextId };
+          conversations.appendTo(conversation.id, [
+            { kind: "assistant", id: nextId, text: "", state: "streaming" },
+          ]);
+        },
         onText: (answer) => {
-          conversations.updateAssistant(conversation.id, lineId, { text: answer });
+          conversations.updateAssistant(conversation.id, activeAssistantId, { text: answer });
         },
         // Thinking streams into the line as it is produced: the wait is then visible as work
         // rather than as a stall.
         onThinking: (thinking) => {
-          conversations.updateAssistant(conversation.id, lineId, { thinking });
+          conversations.updateAssistant(conversation.id, activeAssistantId, { thinking });
         },
         onActivity: (activity) => {
-          conversations.updateAssistant(conversation.id, lineId, { activity: activity ?? "" });
+          conversations.updateAssistant(conversation.id, activeAssistantId, { activity: activity ?? "" });
+        },
+        onAssistantEnd: ({ error }) => {
+          conversations.updateAssistant(conversation.id, activeAssistantId, {
+            state: error ? "error" : "complete",
+            activity: "",
+          });
         },
         // Live, because a turn is several requests and the meter should be right during one.
         onUsage: (usage) => setLiveUsage(usage.totalTokens),
-        // Every tool call becomes a line of its own as it happens, so the work is visible while
-        // it is happening rather than only in its conclusion.
+        // The transcript is a concise execution trace. list_binaries is setup for run_js,
+        // not an action a reader needs to see; the JavaScript call is the useful unit of work.
         onToolStart: (call) => {
+          if (call.name !== "run_js") return;
           conversations.appendTo(conversation.id, [
             { kind: "tool", id: call.id, name: call.name, summary: call.summary, state: "running" },
           ]);
         },
         onToolEnd: (call) => {
+          if (call.name !== "run_js") return;
           conversations.updateTool(conversation.id, call.id, {
             state: call.isError ? "error" : "done",
-            result: call.text,
-            bytes: call.bytes,
           });
         },
       }, mentions);
-      conversations.updateAssistant(conversation.id, lineId, {
+      conversations.updateAssistant(conversation.id, activeAssistantId, {
         text: result.error
           ? agentErrorMessage(result.error)
           : (result.text || "The model returned no text."),

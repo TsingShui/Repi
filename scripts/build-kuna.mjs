@@ -6,12 +6,13 @@
  *
  *   public/kuna/          the wasm, the SLEIGH tree, the preload bundle, the
  *                         licences. Gitignored — 20 MB of build output.
- *   src/vendor/kuna/      the WASI shim both engines run on, committed as it is.
- *                         The engine's own JavaScript harness is **not** vendored
- *                         any more: Kuna is a wasm32-wasip1 program now, so the
- *                         page mounts it and calls it like any other, and all the
- *                         harness had that this needs (the spec tree, the lazy
- *                         `.sla` lookup) lives in `lib/analysis/kuna/kuna-host.ts`.
+ *   src/vendor/kuna/      the WASI shim plus Repi's tiny CLI-WASI compatibility
+ *                         patch, committed as browser build dependencies. The engine's own
+ *                         JavaScript harness is **not** vendored
+ *                         any more: the native Kuna CLI is a wasm32-wasip1 program,
+ *                         so the page mounts it and calls its read-only analysis commands
+ *                         like any other program. The browser host owns the spec tree and
+ *                         lazy `.sla` lookup in `lib/analysis/kuna/kuna-host.ts`.
  *
  * The split is deliberate: the parts the bundler must resolve are in the
  * repository, and the parts that are merely fetched are not. Without a checkout
@@ -33,12 +34,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "..");
 
-const kunaRepo = resolve(process.env.KUNA_REPO ?? join(homedir(), "kuna"));
+const kunaRepo = resolve(process.env.KUNA_REPO ?? join(homedir(), "zhome", "kuna"));
 const skipBuild = process.argv.includes("--skip-build");
 
 const publicDir = join(projectRoot, "public/kuna");
 const vendorDir = join(projectRoot, "src/vendor/kuna");
-const wasmSource = join(kunaRepo, "decompiler/target/wasm32-wasip1/release/kuna_wasm.wasm");
+const wasmSource = join(kunaRepo, "decompiler/target/wasm32-wasip1/release/kuna.wasm");
+// Rust's WASI stdlib does not implement canonicalize(). The native CLI uses it in three
+// read-only query paths, so this small Repi-owned patch keeps the virtual /work path as-is
+// when compiling for WASI. It is applied only for the cargo invocation and reversed in finally:
+// building Repi never leaves a change in the user's Kuna checkout.
+const wasmCliPatch = join(projectRoot, "src/vendor/kuna/patches/cli-wasi-paths.patch");
 
 /** The runtime files the decompiler actually reads. `.slaspec` sources are never read. */
 const RUNTIME_EXTENSIONS = ["ldefs", "pspec", "cspec", "dwarf", "sla"];
@@ -93,7 +99,7 @@ function human(bytes) {
 
 if (!(await exists(join(kunaRepo, "decompiler/Cargo.toml")))) {
   console.error(`No kuna checkout at ${kunaRepo}.`);
-  console.error(`Set KUNA_REPO, or clone github.com/TsingShui/kuna next to this repository.`);
+  console.error(`Set KUNA_REPO, or clone github.com/Noelo-Lab/kuna next to this repository.`);
   process.exit(1);
 }
 
@@ -101,55 +107,59 @@ console.log(`>> kuna checkout: ${kunaRepo}`);
 
 // ------------------------------------------------------------------- wasm
 
-if (skipBuild) {
-  console.log(">> skipping the wasm build");
-} else {
-  console.log(">> building kuna_wasm (wasm32-wasip1, release)");
-  await run("cargo", ["build", "--release", "--target", "wasm32-wasip1", "-p", "kuna-wasm"], {
-    cwd: join(kunaRepo, "decompiler"),
-  });
-}
+let patchApplied = false;
+try {
+  if (skipBuild) {
+    console.log(">> skipping the wasm build");
+  } else {
+    if (!(await exists(wasmCliPatch))) throw new Error(`The vendored WASI patch is missing: ${wasmCliPatch}`);
+    // Check before changing anything. A patch conflict says this Kuna revision needs a fresh
+    // vendor patch; blindly applying a half-match would be worse than declining to build.
+    await run("git", ["apply", "--check", wasmCliPatch], { cwd: kunaRepo });
+    await run("git", ["apply", wasmCliPatch], { cwd: kunaRepo });
+    patchApplied = true;
+    console.log(">> building Kuna CLI (wasm32-wasip1, release; temporary Repi WASI patch)");
+    await run("cargo", ["build", "--release", "--target", "wasm32-wasip1", "-p", "kuna-cli"], {
+      cwd: join(kunaRepo, "decompiler"),
+    });
+  }
 
-if (!(await exists(wasmSource))) {
-  console.error(`The build produced no wasm at ${wasmSource}`);
-  process.exit(1);
-}
+  if (!(await exists(wasmSource))) throw new Error(`The build produced no wasm at ${wasmSource}`);
 
-// ------------------------------------------------------------------ specs
+  // ------------------------------------------------------------------ specs
 
-const specsSource = join(kunaRepo, "specs");
-const runtimeFiles = (await walk(specsSource)).filter((path) =>
-  RUNTIME_EXTENSIONS.includes(path.split(".").pop()),
-);
-const slas = runtimeFiles.filter((path) => path.endsWith(".sla"));
+  const specsSource = join(kunaRepo, "specs");
+  const runtimeFiles = (await walk(specsSource)).filter((path) =>
+    RUNTIME_EXTENSIONS.includes(path.split(".").pop()),
+  );
+  const slas = runtimeFiles.filter((path) => path.endsWith(".sla"));
 
-if (slas.length === 0) {
-  console.error(`No .sla under ${specsSource}. Run \`make specs\` in the kuna checkout first.`);
-  process.exit(1);
-}
+  if (slas.length === 0) {
+    throw new Error(`No .sla under ${specsSource}. Run \`make specs\` in the kuna checkout first.`);
+  }
 
-// ----------------------------------------------------------------- output
+  // ----------------------------------------------------------------- output
 
-await rm(publicDir, { recursive: true, force: true });
-await mkdir(join(publicDir, "specs"), { recursive: true });
+  await rm(publicDir, { recursive: true, force: true });
+  await mkdir(join(publicDir, "specs"), { recursive: true });
 
-await cp(wasmSource, join(publicDir, "kuna_wasm.wasm"));
+  await cp(wasmSource, join(publicDir, "kuna.wasm"));
 
-// The tree keeps its shape: the engine resolves a language by scanning it, so
-// flattening it would break the lookup that makes the lazy `.sla` fetch work.
-for (const path of runtimeFiles) {
-  const target = join(publicDir, "specs", relative(specsSource, path).split(sep).join("/"));
-  await mkdir(dirname(target), { recursive: true });
-  await cp(path, target);
-}
+  // The tree keeps its shape: the engine resolves a language by scanning it, so
+  // flattening it would break the lookup that makes the lazy `.sla` fetch work.
+  for (const path of runtimeFiles) {
+    const target = join(publicDir, "specs", relative(specsSource, path).split(sep).join("/"));
+    await mkdir(dirname(target), { recursive: true });
+    await cp(path, target);
+  }
 
-const preload = {};
-for (const path of runtimeFiles) {
-  if (!PRELOAD_EXTENSIONS.includes(path.split(".").pop())) continue;
-  const key = relative(specsSource, path).split(sep).join("/");
-  preload[key] = (await readFile(path)).toString("base64");
-}
-await writeFile(join(publicDir, "specs-small.json"), JSON.stringify(preload));
+  const preload = {};
+  for (const path of runtimeFiles) {
+    if (!PRELOAD_EXTENSIONS.includes(path.split(".").pop())) continue;
+    const key = relative(specsSource, path).split(sep).join("/");
+    preload[key] = (await readFile(path)).toString("base64");
+  }
+  await writeFile(join(publicDir, "specs-small.json"), JSON.stringify(preload));
 
 // --------------------------------------------------------- vendor shim
 
@@ -188,6 +198,7 @@ Built from a local checkout by \`scripts/build-kuna.mjs\`.
 - Commit: ${await kunaCommit()}
 - Target: wasm32-wasip1, release
 - Runtime SLEIGH files: ${runtimeFiles.length} (${slas.length} \`.sla\`, lazily fetched)
+- Repi applied and then reversed \`src/vendor/kuna/patches/cli-wasi-paths.patch\` for this build.
 
 Kuna is Apache-2.0 and is derived from Ghidra, also Apache-2.0. See
 \`KUNA-LICENSE\` and \`KUNA-NOTICE\`. The vendored WASI shim in
@@ -199,7 +210,7 @@ MIT/Apache-2.0.
 // ------------------------------------------------------------------ report
 
 const measurements = [
-  ["wasm", join(publicDir, "kuna_wasm.wasm")],
+  ["wasm", join(publicDir, "kuna.wasm")],
   ["preload bundle", join(publicDir, "specs-small.json")],
 ];
 console.log(">> assembled public/kuna/");
@@ -210,4 +221,11 @@ const specBytes = (await walk(join(publicDir, "specs"))).reduce(async (total, pa
 console.log(`   specs: ${human(await specBytes)} across ${runtimeFiles.length} files`);
 const everything = (await walk(publicDir)).reduce(async (total, path) => (await total) + (await stat(path)).size, Promise.resolve(0));
 console.log(`   total served: ${human(await everything)}`);
-console.log("   src/vendor/kuna/ holds the WASI shim only (nothing to refresh)");
+console.log("   src/vendor/kuna/ holds the WASI shim and the Repi WASI compatibility patch");
+} finally {
+  if (patchApplied) {
+    // Do not turn a build dependency into an uncommitted change in another repository.
+    await run("git", ["apply", "--reverse", wasmCliPatch], { cwd: kunaRepo });
+    console.log(">> restored the Kuna checkout after the temporary WASI patch");
+  }
+}

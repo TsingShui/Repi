@@ -10,9 +10,9 @@
  * Prints JSON on stdout. Reads the artifacts `npm run build:kuna` produces, so
  * it needs no Kuna checkout of its own.
  *
- *   node scripts/kuna-oracle.mjs list sample.elf
- *   node scripts/kuna-oracle.mjs decompile sample.elf main
- *   node scripts/kuna-oracle.mjs decompile sample.elf 0x1198
+ *   node scripts/kuna-oracle.mjs functions sample.elf --json
+ *   node scripts/kuna-oracle.mjs decompile sample.elf main --json
+ *   node scripts/kuna-oracle.mjs strings sample.elf --json --no-xrefs
  */
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
@@ -22,16 +22,22 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const kunaDir = join(projectRoot, "public/kuna");
 
-const [command, fixture, target] = process.argv.slice(2);
+const [command, fixture, ...commandArgs] = process.argv.slice(2);
 
 if (!command || !fixture) {
-  console.error("usage: kuna-oracle.mjs <list|decompile> <fixture> [name|0xADDR]");
+  console.error("usage: kuna-oracle.mjs <command> <fixture> [command args…]");
   process.exit(64);
 }
 
 const binary = join(kunaDir, "fixtures", fixture);
-const args = [join(here, "kuna-wasi-run.mjs"), join(kunaDir, "kuna_wasm.wasm"), join(kunaDir, "specs"), binary, command];
-if (target !== undefined) args.push(target);
+const args = [
+  join(here, "kuna-wasi-run.mjs"),
+  join(kunaDir, "kuna.wasm"),
+  join(kunaDir, "specs"),
+  binary,
+  command,
+  ...commandArgs,
+];
 
 // The engine prints a warning banner on some Node versions; only stdout is read.
 const output = execFileSync(process.execPath, args, {
@@ -42,14 +48,11 @@ const output = execFileSync(process.execPath, args, {
 
 const parsed = JSON.parse(output);
 
-if (command === "list") {
-  console.log(
-    JSON.stringify({
-      count: parsed.count,
-      names: parsed.functions.map((entry) => entry.name),
-    }),
-  );
-} else {
+if (command === "functions") {
+  console.log(JSON.stringify({ count: parsed.count, names: parsed.functions.map((entry) => entry.name) }));
+} else if (command === "decompile" || command === "decompile-all") {
   const [first] = parsed.functions;
   console.log(JSON.stringify({ name: first.name, code: first.code, address: first.address_hex, size: first.size }));
+} else {
+  console.log(JSON.stringify(parsed));
 }

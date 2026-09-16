@@ -797,18 +797,11 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
   color: var(--ink);
 }
 
-/*
- * A tool call: its own line, its own output.
- *
- * Not a collapsed summary — the output is the evidence, and an analysis whose evidence is hidden
- * asks to be believed rather than checked. Long answers are cut in the DOM with a way to see the
- * rest, which is a decision about reading, not about what happened.
- */
+/* A tool call is a compact activity row; the assistant explains the result in its answer. */
 .tool-line {
   display: flex;
   max-width: 100%;
   flex-direction: column;
-  gap: 6px;
   border-left: 2px solid var(--line-strong);
   padding: 2px 0 2px 12px;
 }
@@ -863,40 +856,6 @@ html[data-theme="dark"] .markdown-body .hljs-tag {
   50% {
     opacity: 1;
   }
-}
-
-.tool-output {
-  min-width: 0;
-}
-
-.tool-output pre {
-  max-height: 40vh;
-  margin: 0;
-  overflow: auto;
-  border-radius: var(--r-sm);
-  background: var(--canvas-raised);
-  padding: 10px 12px;
-  color: var(--ink-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.tool-more {
-  margin-top: 4px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: var(--ink-faint);
-  font-size: 11px;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
-}
-
-.tool-more:hover {
-  color: var(--ink);
 }
 
 /*

@@ -1,24 +1,28 @@
 /**
- * Runs the Kuna wasm under Node's built-in WASI and writes the engine's JSON to
- * stdout. The small half of `scripts/kuna-oracle.mjs`, kept separate because a
- * Node process cannot both be the WASI host and capture the host's own stdout.
+ * Runs the native Kuna CLI wasm under Node's built-in WASI. It is the small half of
+ * `scripts/kuna-oracle.mjs`, kept separate because a Node process cannot both host
+ * WASI and capture its own stdout.
+ *
+ * All arguments after the binary are passed to Kuna unchanged. This is intentionally the
+ * browser contract too: a caller gives native CLI argv, while the host pins `--sleighpath`
+ * to the preopened spec tree.
  */
 import { WASI } from "node:wasi";
 import { readFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 
-const [wasmPath, specsDir, binaryPath, command, target] = process.argv.slice(2);
+const [wasmPath, specsDir, binaryPath, command, ...commandArgs] = process.argv.slice(2);
 
 if (!wasmPath || !specsDir || !binaryPath || !command) {
-  console.error("usage: kuna-wasi-run.mjs <wasm> <specs-dir> <binary> <list|decompile> [target]");
+  console.error("usage: kuna-wasi-run.mjs <wasm> <specs-dir> <binary> <command> [command args…]");
   process.exit(64);
 }
 
-// The virtual filesystem the guest sees: the SLEIGH tree and the binary, both
-// preopened, which is exactly how the browser shim presents them.
+// The virtual filesystem the guest sees: compiled specs and the binary, both preopened,
+// exactly as the browser shim presents them.
 const wasi = new WASI({
   version: "preview1",
-  args: ["kuna_wasm", `/work/${basename(binaryPath)}`, "/specs", command, ...(target === undefined ? [] : [target])],
+  args: ["kuna", command, `/work/${basename(binaryPath)}`, ...commandArgs, "--sleighpath", "/specs"],
   env: {},
   preopens: { "/specs": specsDir, "/work": dirname(binaryPath) },
 });

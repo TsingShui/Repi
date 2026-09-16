@@ -1,22 +1,11 @@
 /**
- * Kuna, through the host the sandbox calls it with.
+ * The native Kuna CLI, through the same browser host that a sandbox calls.
  *
- * This is the check that the bridge is real: the wasm is Kuna's own build, the spec tree is
- * the one `npm run build:kuna` assembles, and the two are driven exactly as the Worker drives
- * them — a command line in, two streams and a status out, with the language resolved by
- * failing once and fetching what the engine asked for.
+ * This verifies the useful seam rather than a bespoke browser command language:
+ * a run_js program gives Kuna native CLI argv, the host fixes the SLEIGH location,
+ * rejects commands that can write, and retries after fetching exactly one missing `.sla`.
  *
- * What it covers that nothing else can:
- *
- *  - the argument list the guest actually parses (`<binary> <spec-root> <cmd> [arg]`),
- *  - the small-spec bundle really is enough to start (`list` works without any `.sla`),
- *  - a `.sla` that is missing is *named by the engine*, recorded, fetched, and the same call
- *    succeeds on the second attempt — which is the whole reason the fetch happens between
- *    programs instead of inside one,
- *  - and the sandbox sees all of it through `kuna(args)`.
- *
- * The spec tree is served over HTTP because that is how the browser fetches it; `fetch` will
- * not read `file:` URLs.
+ * It needs `npm run build:kuna` first, because public/kuna is intentionally build output.
  *
  *   node scripts/run-analysis-check.mjs kuna-check
  */
@@ -77,10 +66,9 @@ try {
     process.exit(0);
   }
 
-  const wasm = await WebAssembly.compile(await readFile(resolve(served, "kuna_wasm.wasm")));
+  const wasm = await WebAssembly.compile(await readFile(resolve(served, "kuna.wasm")));
   const binary = await readFile(resolve(served, "fixtures/sample.elf"));
   const mounts = new Map<string, Uint8Array>([["input.bin", binary]]);
-
   const host = await createKunaHost({
     wasm,
     specRoot: `${origin}/specs`,
@@ -89,16 +77,16 @@ try {
 
   // ------------------------------------------------ the loop: fail, fetch, retry
 
-  const firstList = host.run([ARCHIVE, "list"], mounts);
-  const asked = /Could not find \.sla file for (\S+)/.exec(firstList.stderr)?.[1];
+  const firstFunctions = host.run(["functions", ARCHIVE, "--json"], mounts);
+  const asked = /Could not find \.sla file for (\S+)/.exec(firstFunctions.stderr)?.[1];
   check(
     "the engine names the language it needs",
-    firstList.code !== 0 && asked !== undefined,
-    `exit ${firstList.code}, asked for ${asked ?? "nothing"}`,
+    firstFunctions.code !== 0 && asked !== undefined,
+    `exit ${firstFunctions.code}, asked for ${asked ?? "nothing"}`,
   );
   check(
     "the host records it and says so in the answer",
-    host.missingLanguages().length > 0 && firstList.stderr.includes("[kuna] fetching"),
+    host.missingLanguages().length > 0 && firstFunctions.stderr.includes("[kuna] fetching"),
     host.missingLanguages().join(", "),
   );
 
@@ -106,7 +94,7 @@ try {
   check("the fetch happens between programs", arrived > 0, `${arrived} spec file(s)`);
   check("and nothing is left pending", host.missingLanguages().length === 0);
 
-  const listed = host.run([ARCHIVE, "list"], mounts);
+  const listed = host.run(["functions", ARCHIVE, "--json"], mounts);
   let inventory: { count?: number; functions?: { name?: string }[] } = {};
   try {
     inventory = JSON.parse(listed.stdout) as typeof inventory;
@@ -121,13 +109,91 @@ try {
       (listed.code === 0 ? "" : ` — ${(listed.stderr.trim().split("\n")[0] ?? "")}`),
   );
 
-  // ------------------------------------------------------------------- decompile
+  // ----------------------------------------------------------- native CLI queries
+
+  const strings = host.run(["strings", ARCHIVE, "--json", "--no-xrefs"], mounts);
+  let stringsDocument: { strings?: unknown[] } = {};
+  try {
+    stringsDocument = JSON.parse(strings.stdout) as typeof stringsDocument;
+  } catch {
+    /* reported below */
+  }
+  check(
+    "strings is the native CLI query, not a browser-specific command",
+    strings.code === 0 && Array.isArray(stringsDocument.strings),
+    `exit ${strings.code}, ${stringsDocument.strings?.length ?? 0} strings`,
+  );
+
+  const xrefs = host.run(["xrefs", ARCHIVE, "--to", "0x1000", "--json"], mounts);
+  let xrefDocument: { target?: unknown } = {};
+  try {
+    xrefDocument = JSON.parse(xrefs.stdout) as typeof xrefDocument;
+  } catch {
+    /* reported below */
+  }
+  check(
+    "xrefs accepts native CLI ordering and its query flags",
+    xrefs.code === 0 && xrefDocument.target !== undefined,
+    `exit ${xrefs.code}`,
+  );
+
+  const listing = host.run(["disassemble", ARCHIVE, "0x1000", "--count", "0x3", "--json"], mounts);
+  let listingDocument: { instructions?: unknown[] } = {};
+  try {
+    listingDocument = JSON.parse(listing.stdout) as typeof listingDocument;
+  } catch {
+    /* reported below */
+  }
+  check(
+    "disassemble accepts a bounded native CLI query and a hexadecimal count",
+    listing.code === 0 && Array.isArray(listingDocument.instructions),
+    `exit ${listing.code}, ${listingDocument.instructions?.length ?? 0} instructions`,
+  );
+
+  const raw = host.run(["read", ARCHIVE, "0x1000", "--bytes", "0x10", "--json"], mounts);
+  let rawDocument: { hex?: string } = {};
+  try {
+    rawDocument = JSON.parse(raw.stdout) as typeof rawDocument;
+  } catch {
+    /* reported below */
+  }
+  check(
+    "read accepts a hexadecimal byte count",
+    raw.code === 0 && typeof rawDocument.hex === "string" && rawDocument.hex.length === 32,
+    `exit ${raw.code}, ${rawDocument.hex?.length ?? 0} hex digits`,
+  );
+
+  const reversed = host.run(["read", "0x1000", ARCHIVE, "--bytes", "0x10", "--json"], mounts);
+  check(
+    "read repairs target-before-binary ordering",
+    reversed.code === 0 && reversed.stdout.includes("\"start\": 4096"),
+    `exit ${reversed.code}`,
+  );
+
+  let missingTargetRefused = false;
+  try {
+    host.run(["disassemble", ARCHIVE, "--count", "3", "--json"], mounts);
+  } catch (error) {
+    missingTargetRefused = String(error).includes("needs a function name, address, or address range");
+  }
+  check("disassemble rejects a missing target before guest execution", missingTargetRefused);
+
+  let catalogRefused = false;
+  try {
+    host.run(["catalog", ARCHIVE, "--json"], mounts);
+  } catch (error) {
+    catalogRefused = String(error).includes("unavailable");
+  }
+  check(
+    "catalog is refused: its native implementation needs a second executable",
+    catalogRefused,
+  );
 
   const target = names[0];
   if (target === undefined) {
     check("a function to decompile", false, "the inventory was empty");
   } else {
-    const decompiled = host.run([ARCHIVE, "decompile", target], mounts);
+    const decompiled = host.run(["decompile", ARCHIVE, target, "--json"], mounts);
     let document: { functions?: { code?: string | null }[] } = {};
     try {
       document = JSON.parse(decompiled.stdout) as typeof document;
@@ -136,10 +202,28 @@ try {
     }
     const code = (document.functions ?? []).map((entry) => entry.code ?? "").join("\n");
     check(
-      "decompiling a function returns C",
+      "decompile returns C through native CLI argv",
       decompiled.code === 0 && code.includes(target) && code.includes("{"),
       `exit ${decompiled.code}, ${code.length} bytes of C`,
     );
+  }
+
+  // --------------------------------------------------------------- write policy
+
+  for (const [label, args] of [
+    ["project alias", ["project", ARCHIVE]],
+    ["decompile-project", ["decompile-project", ARCHIVE]],
+    ["output option", ["decompile-graph", ARCHIVE, "--output", "/work/out.json"]],
+    ["spec override", ["functions", ARCHIVE, "--sleighpath", "/work/not-specs"]],
+    ["worker option", ["decompile-all", ARCHIVE, "--jobs", "2"]],
+  ] as const) {
+    let refused = false;
+    try {
+      host.run(args, mounts);
+    } catch {
+      refused = true;
+    }
+    check(`${label} is refused before guest execution`, refused);
   }
 
   // -------------------------------------------------------------- through the sandbox
@@ -147,21 +231,17 @@ try {
   const sandbox = new Sandbox(
     {
       functions: {
-        kuna: (args): EngineOutcome =>
-          host.run(
-            args.map((arg) => String(arg)),
-            mounts,
-          ),
+        kuna: (args): EngineOutcome => host.run(args.map((arg) => String(arg)), mounts),
       },
     },
     { deadlineMs: 60_000, memoryBytes: 512 << 20 },
   );
 
   const outcome = await sandbox.run(`
-    const inventory = JSON.parse(kuna(['${ARCHIVE}', 'list']).stdout);
+    const inventory = JSON.parse(kuna(['functions', '${ARCHIVE}', '--json']).stdout);
     const target = inventory.functions[0].name;
-    let out = kuna(['${ARCHIVE}', 'decompile', target]);
-    if (out.code !== 0) out = kuna(['${ARCHIVE}', 'decompile', target]);  // the spec arrives between runs
+    let out = kuna(['decompile', '${ARCHIVE}', target, '--json']);
+    if (out.code !== 0) out = kuna(['decompile', '${ARCHIVE}', target, '--json']);
     const first = JSON.parse(out.stdout).functions[0];
     return JSON.stringify({ count: inventory.count, target, c: first.code.slice(0, 60) });
   `);
@@ -169,22 +249,18 @@ try {
   if (outcome.error === null && outcome.result !== null) {
     const summary = JSON.parse(outcome.result) as { count: number; target: string; c: string };
     check(
-      "a program sees the engine through kuna(args)",
+      "a run_js program sees the native CLI through kuna(args)",
       summary.count > 0 && summary.c.length > 0,
       `${summary.count} functions, ${summary.target}: ${summary.c.replaceAll("\n", " ").slice(0, 50)}`,
     );
   } else {
     check(
-      "a program sees the engine through kuna(args)",
+      "a run_js program sees the native CLI through kuna(args)",
       false,
       outcome.error ? `${outcome.error.name}: ${outcome.error.message}` : "no result",
     );
   }
-  check(
-    "the engine call is the expensive part, and it is counted",
-    outcome.calls >= 2,
-    `${outcome.calls} engine call(s), ${outcome.ms} ms`,
-  );
+  check("the engine call is counted", outcome.calls >= 2, `${outcome.calls} engine call(s), ${outcome.ms} ms`);
 } finally {
   server.close();
 }

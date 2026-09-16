@@ -42,9 +42,10 @@ program runs on the user's device, beside the analyser, and only what it prints 
 comes back to you — the binary never leaves the machine and never enters this conversation.
 
 Everything the app holds is reachable from here: the binaries the user uploaded (in this
-conversation or any other — the filesystem is shared, and list_binaries reports every one with the
-id run_js takes) and everything a program has produced. What is not shared is attention: one
-program runs against one binary, so pick the id you mean.
+conversation or any other — the filesystem is shared). **Call the list_binaries tool before
+run_js to obtain the fileId it takes.** list_binaries is an Agent tool, not a JavaScript
+function inside the sandbox; inside a run_js program use ls() only for mounted /work/... paths.
+What is not shared is attention: one program runs against one binary, so pick the id you mean.
 
 You have a filesystem, and it keeps things. \`write\` stores text under a path — a script you
 are about to run twice, a listing you computed, a note worth keeping — and \`read\` opens one
@@ -69,6 +70,10 @@ where they are useful, and prefer one program that answers the question over man
 print raw output.`;
 
 export interface AgentRunCallbacks {
+  /** A new model response begins. Tool calls therefore divide visible model responses. */
+  readonly onAssistantStart?: () => void;
+  /** A model response is complete, immediately before any requested tools execute. */
+  readonly onAssistantEnd?: (options: { readonly error: boolean }) => void;
   readonly onText: (text: string) => void;
   readonly onActivity: (activity: string | undefined) => void;
   /**
@@ -144,6 +149,7 @@ export interface AgentRunResult {
 const DEFAULT_PROGRAM_SECONDS = 120;
 const MIN_PROGRAM_SECONDS = 5;
 const MAX_PROGRAM_SECONDS = 600;
+
 
 /** The requested budget in milliseconds, and whether the request had to be pulled into range. */
 function programBudget(timeout: number | undefined): { ms: number; clamped: boolean } {
@@ -257,20 +263,49 @@ program again, so read the answer, not a first failure. In scope:
                    rasc(['strings', '--limit', '50', '--filter', 'http', '/work/<the attached file>'])
                    rasc(['getclass', '/work/<the attached file>', 'com.example.MainActivity'])
                    extract('/lib/arm64-v8a/libfoo.so')      // { path, bytes }
-                   kuna([binaryPath, 'list'])               // every function as a JSON record
-                   kuna([binaryPath, 'decompile', 'JNI_OnLoad'])
-                   kuna([binaryPath, 'decompile', '0x401000'])   // by address instead of name
-                   kuna([binaryPath, 'decompile'])               // all of them: megabytes
-                   kuna([binaryPath, 'project'])                 // a project export into /work
+                   kuna(['functions', binaryPath, '--json'])
+                   kuna(['strings', binaryPath, '--json', '--filter', 'license'])
+                   kuna(['xrefs', binaryPath, '--to', 'JNI_OnLoad', '--json'])
+                   kuna(['decompile', binaryPath, 'JNI_OnLoad', '--json'])
+                   kuna(['read', binaryPath, '0x400000', '--addr', '--bytes', '0x180', '--json'])
+                   kuna(['disassemble', binaryPath, '0x401000', '--addr', '--count', '0x30', '--json'])
+                   kuna(['decompile-all', binaryPath, '--functions', 'check_license,verify_sig', '--json'])
+                   kuna(['decompile-graph', binaryPath, '--functions', 'check_license,verify_sig'])
   extract(path)  pulls one entry out of the archive and mounts it, returning the path to use
                  afterwards — this is how a native library inside an APK reaches Kuna.
 
-Kuna has exactly three subcommands — \`list\`, \`decompile\`, \`project\` — and anything else
-comes back as a usage error rather than as data, so do not reach for \`info\` or \`functions\`.
-\`list\` is one record per function, which on a real library is hundreds of records, and
-\`decompile\` with no argument is the whole binary: count, filter and sample those in the program.
-When you want the whole thing, write() it to a file and read it back in windows — the transcript
-only needs the part that answers the question.
+**Kuna investigation workflow.** Start with \`functions --summary --json\` to orient on a large
+native binary, then use a targeted \`strings --filter ... --json\`, \`functions --filter ... --json\`,
+or \`xrefs --to/--from ... --json\` to find a candidate. Check \`count\` before using a returned
+function: \`count: 0\` is a valid no-match answer, not a function named \`undefined\`. Once a target
+is known, use \`decompile --json\`; verify an important branch, lookup table, or obfuscated data
+with \`disassemble\` or \`read\` at its exact address. For a small related set, use
+\`decompile-all --functions name1,name2 --json\` or \`decompile-graph --functions name1,name2\`.
+Do not say that you will inspect or decompile something and then end the turn: issue the matching
+\`run_js\` call in that same turn, inspect its result, and either continue to the evidence needed for
+the user's question or give a final answer.
+
+Kuna takes the native CLI argument order: command first, then the mounted binary, then that
+command's flags. The read-only analysis surface is \`functions\`, \`decompile\` (with
+\`--json\`), \`decompile-all\`, \`decompile-graph\`, \`strings\`, \`xrefs\`, \`read\`,
+\`disassemble\`, \`modes\`, \`docs\` and \`version\`. Global commands do not need the binary
+path (the host tolerates a mounted one if you include it). \`catalog\` is not available because
+its native implementation starts a second executable, which browser WASI cannot run. Addresses
+and \`--bytes\` / \`--count\` may be hexadecimal, e.g. \`0x400000\` and \`0x180\`.
+The host supplies \`--sleighpath /specs\`;
+do not supply or override it. \`decompile-project\`/\`project\` are deliberately unavailable:
+use \`decompile-all --functions a,b\` or \`decompile-graph --functions a,b\` to select the
+functions that answer the question. Likewise, commands or flags that write files (including
+\`-o\` / \`--output\`) and process-worker flags are refused. \`read\` and \`disassemble\` need
+their target as the positional argument immediately after \`binaryPath\` — do not leave it out
+or derive it from \`functions[0]\` until you checked that a function exists. A filtered
+\`functions\` document can honestly say \`count: 0\`, \`total: 465\`: the filter matched none
+of 465 discovered functions, so change the filter or use a known address instead of issuing a
+follow-up with an undefined target. \`functions\` may return hundreds of records; use its
+\`--filter\`, \`--limit\`, \`--summary\` and \`--sort\` options instead of printing a full
+inventory. \`decompile-all\` with no selection is a whole-binary operation and can be megabytes:
+prefer \`--functions\` or \`--addr\`, return a count and sample, and write a large answer to the
+sandbox filesystem only when it is genuinely needed.
   tools()        what this sandbox can do: each tool, and whether it is loaded yet.
   print(value)   adds a line to what you receive. The last expression's value (or a returned
                  value) is returned to you as well.
@@ -644,14 +679,12 @@ that comes after. What is not shared is attention — a program runs against one
       }
     }
 
-    let completedText = "";
+    let lastText = "";
     let currentText = "";
     let currentThinking = "";
     let finalError: string | null = null;
-    let turns = 0;
     /** Set when a turn ended because the context filled: the run continues after compacting. */
     let compacting = false;
-    const visibleText = () => [completedText, currentText].filter(Boolean).join("\n\n");
     const agent = new Agent({
       initialState: {
         systemPrompt: SYSTEM_PROMPT + deviceParagraph(options.device?.describe() ?? null),
@@ -671,8 +704,6 @@ that comes after. What is not shared is attention — a program runs against one
       convertToLlm,
       getApiKey: () => apiKey,
       shouldStopAfterTurn: () => {
-        turns += 1;
-        if (turns >= 12) return true;
         // Stop *before* the next request rather than after it fails: the context is over its
         // threshold, and the run resumes with the compacted transcript a moment later.
         if (needsCompaction(agent.state.messages, model.contextWindow)) {
@@ -689,9 +720,10 @@ that comes after. What is not shared is attention — a program runs against one
       if (event.type === "message_start" && event.message.role === "assistant") {
         currentText = "";
         currentThinking = "";
+        callbacks.onAssistantStart?.();
       } else if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
         currentText += event.assistantMessageEvent.delta;
-        callbacks.onText(visibleText());
+        callbacks.onText(currentText);
         callbacks.onActivity(undefined);
       } else if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_start") {
         // Before the first token arrives, the activity line is the only sign that the wait is
@@ -725,11 +757,13 @@ that comes after. What is not shared is attention — a program runs against one
         const complete = assistantText(event.message);
         if (complete) {
           currentText = complete;
-          callbacks.onText(visibleText());
-          completedText = visibleText();
-          currentText = "";
+          lastText = complete;
+          callbacks.onText(currentText);
         }
-        if (event.message.stopReason === "error" || event.message.stopReason === "aborted") {
+        const endedWithError = event.message.stopReason === "error" || event.message.stopReason === "aborted";
+        callbacks.onAssistantEnd?.({ error: endedWithError });
+        currentText = "";
+        if (endedWithError) {
           finalError =
             event.message.stopReason === "aborted"
               ? "Stopped."
@@ -769,7 +803,7 @@ that comes after. What is not shared is attention — a program runs against one
        * that does not free enough room would otherwise loop: three rounds in, the run stops and
        * the error is the honest outcome.
        */
-      for (let round = 0; compacting && round < 3; round += 1) {
+      while (compacting) {
         compacting = false;
         const compacted = await compactMessages(agent.state.messages, {
           model,
@@ -779,7 +813,6 @@ that comes after. What is not shared is attention — a program runs against one
         if (!compacted) break;
         agent.state.messages = [...compacted.messages];
         callbacks.onCompacted?.(compacted.outcome);
-        turns = 0;
         await agent.continue();
       }
 
@@ -793,7 +826,7 @@ that comes after. What is not shared is attention — a program runs against one
             // starts from, and dropping it here would silently forget the compacted history.
             message.role === "compactionSummary",
         ),
-        text: visibleText(),
+        text: lastText,
         error: finalError,
       };
     } finally {

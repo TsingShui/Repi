@@ -1,0 +1,60 @@
+diff --git a/decompiler/crates/kuna-cli/src/decompile_all.rs b/decompiler/crates/kuna-cli/src/decompile_all.rs
+index ab1eeeca..2f225d09 100644
+--- a/decompiler/crates/kuna-cli/src/decompile_all.rs
++++ b/decompiler/crates/kuna-cli/src/decompile_all.rs
+@@ -1577,10 +1577,17 @@ pub(crate) fn load_program(
+     args: &Args,
+     defaults: DriverDefaults,
+ ) -> Result<ConsoleProgram, String> {
+-    let binary = std::fs::canonicalize(&args.binary)
+-        .map_err(|_| format!("binary not found: {}", args.binary))?
+-        .to_string_lossy()
+-        .into_owned();
++    let binary = {
++        #[cfg(target_os = "wasi")]
++        { args.binary.clone() }
++        #[cfg(not(target_os = "wasi"))]
++        {
++            std::fs::canonicalize(&args.binary)
++                .map_err(|_| format!("binary not found: {}", args.binary))?
++                .to_string_lossy()
++                .into_owned()
++        }
++    };
+     // Load-time loader gates are read by `bootstrap_from_object` itself, so they
+     // must be exported BEFORE it runs (the same gates `kuna decompile` threads to
+     // the subprocess env). Keep the restoration guard alive through runtime
+diff --git a/decompiler/crates/kuna-cli/src/decompile_graph.rs b/decompiler/crates/kuna-cli/src/decompile_graph.rs
+index 0eb30030..6bed60ba 100644
+--- a/decompiler/crates/kuna-cli/src/decompile_graph.rs
++++ b/decompiler/crates/kuna-cli/src/decompile_graph.rs
+@@ -126,8 +126,15 @@ pub fn run(argv: &[String]) -> i32 {
+ /// is off for this command too (`parse_args_with_filters`), so a rustc-built
+ /// binary does not trip the refusal on its own.
+ fn export(args: &Args, label: &str) -> Result<String, String> {
+-    let binary_path = std::fs::canonicalize(&args.binary)
+-        .map_err(|_| format!("binary not found: {}", args.binary))?;
++    let binary_path = {
++        #[cfg(target_os = "wasi")]
++        { std::path::PathBuf::from(&args.binary) }
++        #[cfg(not(target_os = "wasi"))]
++        {
++            std::fs::canonicalize(&args.binary)
++                .map_err(|_| format!("binary not found: {}", args.binary))?
++        }
++    };
+     // The object view first: an input without one (a UEFI TE) is refused
+     // before anything is loaded or decompiled for nothing.
+     let bytes = crate::decompile_all::image_bytes(&args.binary, args.slice_pref())?;
+diff --git a/decompiler/crates/kuna-cli/src/xrefs.rs b/decompiler/crates/kuna-cli/src/xrefs.rs
+index ccdbf823..8c0249d9 100644
+--- a/decompiler/crates/kuna-cli/src/xrefs.rs
++++ b/decompiler/crates/kuna-cli/src/xrefs.rs
+@@ -206,6 +206,7 @@ fn query(args: &XrefArgs) -> Result<String, String> {
+     // The object view first: an input without one (a UEFI TE) is refused
+     // before the engine is brought up for nothing. A missing file keeps the
+     // message `load_program` would have given it.
++    #[cfg(not(target_os = "wasi"))]
+     std::fs::canonicalize(&args.binary)
+         .map_err(|_| format!("binary not found: {}", args.binary))?;
+     let bytes = crate::decompile_all::image_bytes(

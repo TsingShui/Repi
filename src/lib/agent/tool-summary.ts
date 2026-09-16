@@ -59,10 +59,10 @@ export function toolSummary(name: string, args: unknown): string {
         `${field(record, "path") ?? ""}: ${JSON.stringify(clip(field(record, "old") ?? "", 40))} → ${JSON.stringify(clip(field(record, "new") ?? "", 40))}`,
       );
     case "run_js": {
-      const code = field(record, "code") ?? "";
-      const timeout = record.timeout;
-      const budget = typeof timeout === "number" ? `, ≤ ${timeout}s` : "";
-      return clip(`${code.split("\n").length} lines of JavaScript${budget}`);
+      // The transcript is an activity trace, not another code editor. Showing the source in the
+      // call's own shape is enough to say what ran; engine output belongs to the agent's answer.
+      const code = clip(field(record, "code") ?? "", LIMIT - 14);
+      return `[${JSON.stringify(code)}]`;
     }
     case "list_binaries":
       return "";

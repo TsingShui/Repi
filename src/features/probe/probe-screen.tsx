@@ -42,9 +42,9 @@ const apkProgram = (binary: string) => `
 
   const before = ls();
   const picked = extract(arm64[0] ?? libraries[0]);
-  const listed = JSON.parse(kuna([picked.path, 'list']).stdout);
+  const listed = JSON.parse(kuna(['functions', picked.path, '--json']).stdout);
   const wanted = listed.functions.find((fn) => /JNI|Java_/.test(fn.name)) ?? listed.functions[0];
-  const decompiled = JSON.parse(kuna([picked.path, 'decompile', wanted.name]).stdout);
+  const decompiled = JSON.parse(kuna(['decompile', picked.path, wanted.name, '--json']).stdout);
   return JSON.stringify({
     tools: tools(),
     sandboxBefore: before.map((entry) => entry.path + ' (' + entry.bytes + 'B)'),
@@ -58,9 +58,9 @@ const apkProgram = (binary: string) => `
 
 /** Lists and decompiles: this is the path that needs a SLEIGH spec fetched on demand. */
 const kunaProgram = (binary: string) => `
-  const listed = JSON.parse(kuna(['${binary}', 'list']).stdout);   // the host re-runs this once if a spec has to be fetched
+  const listed = JSON.parse(kuna(['functions', '${binary}', '--json']).stdout);   // the host re-runs this once if a spec has to be fetched
   const target = listed.functions[0].name;
-  const decompiled = JSON.parse(kuna(['${binary}', 'decompile', target]).stdout);
+  const decompiled = JSON.parse(kuna(['decompile', '${binary}', target, '--json']).stdout);
   return JSON.stringify({ functions: listed.count, target, c: decompiled.functions[0].code.split('\\n')[0] });
 `;
 
